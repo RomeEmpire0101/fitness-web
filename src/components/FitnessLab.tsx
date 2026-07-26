@@ -1,12 +1,12 @@
 "use client";
 
-import dynamic from "next/dynamic";
 import { Info, Rotate3D, RotateCcw } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
   CharacterEditor,
   useCharacterProfile,
 } from "@/features/characters";
+import CharacterScene from "@/features/characters/scene/CharacterScene";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
   derivePhysique,
@@ -18,19 +18,6 @@ import {
 import { GuideDialog } from "./lab/GuideDialog";
 import { MetricCard } from "./lab/MetricCard";
 import { ResultPanel } from "./lab/ResultPanel";
-
-const CharacterScene = dynamic(
-  () => import("@/features/characters/scene/CharacterScene"),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="model-loading" aria-label="Loading the interactive model">
-        <span />
-        <p>Building character model</p>
-      </div>
-    ),
-  },
-);
 
 export function FitnessLab() {
   const [values, setValues] = useState<SimulationValues>(INITIAL_VALUES);

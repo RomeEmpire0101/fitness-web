@@ -3,11 +3,17 @@
   "version": "1.0.0",
   "private": true,
   "scripts": {
-    "dev": "next dev --webpack",
-    "build": "next build --webpack",
-    "start": "next start",
+    "dev": "vinext dev --port 3000",
+    "build": "vinext build && node scripts/prepare-sites-build.mjs",
+    "start": "vinext start",
+    "dev:next": "next dev --webpack",
+    "build:next": "next build --webpack",
     "lint": "eslint .",
-    "typecheck": "tsc --noEmit --incremental false"
+    "typecheck": "tsc --noEmit --incremental false",
+    "dev:vinext": "vinext dev --port 3001",
+    "build:vinext": "vinext build",
+    "start:vinext": "wrangler dev --config dist/server/wrangler.json",
+    "deploy:vinext": "vinext-cloudflare deploy --config dist/server/wrangler.json"
   },
   "dependencies": {
     "@fontsource/manrope": "latest",
@@ -21,12 +27,21 @@
     "three": "latest"
   },
   "devDependencies": {
+    "@cloudflare/vite-plugin": "^1.47.0",
     "@types/node": "latest",
     "@types/react": "latest",
     "@types/react-dom": "latest",
     "@types/three": "latest",
+    "@vinext/cloudflare": "^1.0.0-beta.4",
+    "@vitejs/plugin-react": "^6.0.4",
+    "@vitejs/plugin-rsc": "^0.5.30",
     "eslint": "latest",
     "eslint-config-next": "latest",
-    "typescript": "latest"
-  }
+    "react-server-dom-webpack": "^19.2.8",
+    "typescript": "latest",
+    "vinext": "^1.0.0-beta.4",
+    "vite": "^8.1.5",
+    "wrangler": "^4.114.0"
+  },
+  "type": "module"
 }

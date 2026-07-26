@@ -28,3 +28,6 @@ next-env.d.ts
 # Sites artifacts
 /.openai/*
 !/.openai/hosting.json
+.vinext/
+.wrangler/
+.vs/

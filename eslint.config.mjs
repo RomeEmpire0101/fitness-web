@@ -8,6 +8,8 @@ export default defineConfig([
   globalIgnores([
     ".next/**",
     ".openai/**",
+    ".vinext/**",
+    ".wrangler/**",
     "out/**",
     "build/**",
     "dist/**",
