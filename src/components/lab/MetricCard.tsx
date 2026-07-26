@@ -4,14 +4,12 @@ import {
   CSSProperties,
   ChangeEvent,
   KeyboardEvent,
+  useCallback,
   useEffect,
   useRef,
   useState,
 } from "react";
-import {
-  MetricDefinition,
-  MetricId,
-} from "@/lib/simulation";
+import { MetricDefinition, MetricId } from "@/lib/simulation";
 
 type MetricCardProps = {
   metric: MetricDefinition;
@@ -30,15 +28,21 @@ export function MetricCard({
 }: MetricCardProps) {
   const progress =
     ((value - metric.min) / (metric.max - metric.min)) * 100;
-  const Icon = metric.Icon;
   const precision = metric.step < 1 ? 1 : 0;
   const editing = useRef(false);
-  const formatValue = (next: number) => next.toFixed(precision);
+  const formatValue = useCallback(
+    (next: number) =>
+      next > 0 && metric.id === "calorieBalance"
+        ? `+${next.toFixed(precision)}`
+        : next.toFixed(precision),
+    [metric.id, precision],
+  );
   const [draft, setDraft] = useState(formatValue(value));
+  const Icon = metric.Icon;
 
   useEffect(() => {
-    if (!editing.current) setDraft(value.toFixed(precision));
-  }, [precision, value]);
+    if (!editing.current) setDraft(formatValue(value));
+  }, [formatValue, value]);
 
   const updateRange = (event: ChangeEvent<HTMLInputElement>) => {
     const next = Number(event.target.value);
@@ -80,37 +84,28 @@ export function MetricCard({
       style={
         {
           "--metric-accent": metric.accent,
-          "--range-progress": `${progress}%`,
+          "--metric-progress": `${progress}%`,
         } as CSSProperties
       }
       onPointerDown={() => onActivate(metric.id)}
       onFocus={() => onActivate(metric.id)}
     >
-      <div className="metric-card__glow" />
       <header className="metric-card__header">
-        <span className="metric-icon" aria-hidden="true">
-          <Icon size={17} strokeWidth={1.8} />
+        <span className="metric-card__icon" aria-hidden="true">
+          <Icon size={16} strokeWidth={1.9} />
         </span>
-        <div>
-          <h2>{metric.label}</h2>
-          <p>{metric.description}</p>
-        </div>
-        <span className="metric-state">{metric.describe(value)}</span>
+        <span>
+          <strong>{metric.shortLabel}</strong>
+          <small>{metric.describe(value)}</small>
+        </span>
       </header>
 
-      <div className="metric-value-row">
-        <label htmlFor={`${metric.id}-number`} className="sr-only">
-          {metric.label} in {metric.unit}
-        </label>
+      <div className="metric-card__value">
         <input
           id={`${metric.id}-number`}
-          className="metric-number"
-          type="number"
-          value={draft}
-          min={metric.min}
-          max={metric.max}
-          step={metric.step}
+          type="text"
           inputMode="decimal"
+          value={draft}
           onFocus={() => {
             editing.current = true;
             onActivate(metric.id);
@@ -118,33 +113,34 @@ export function MetricCard({
           onChange={updateDraft}
           onBlur={commitDraft}
           onKeyDown={handleNumberKey}
+          aria-label={`${metric.label} value`}
           aria-describedby={`${metric.id}-description`}
         />
-        <span>{metric.unit}</span>
+        <span>{metric.shortUnit}</span>
       </div>
 
-      <label htmlFor={`${metric.id}-range`} className="sr-only">
-        Adjust {metric.label}
-      </label>
-      <input
-        id={`${metric.id}-range`}
-        className="metric-range"
-        type="range"
-        min={metric.min}
-        max={metric.max}
-        step={metric.step}
-        value={value}
-        onChange={updateRange}
-        aria-valuetext={`${value.toFixed(precision)} ${metric.unit}, ${metric.describe(value)}`}
-      />
-
-      <footer id={`${metric.id}-description`} className="metric-card__footer">
-        <span>{metric.min}</span>
-        <span className="metric-live">
+      <label className="metric-card__range">
+        <span className="sr-only">Adjust {metric.label}</span>
+        <span aria-hidden="true">
           <i />
-          Live input
         </span>
-        <span>{metric.max}</span>
+        <input
+          id={`${metric.id}-range`}
+          type="range"
+          min={metric.min}
+          max={metric.max}
+          step={metric.step}
+          value={value}
+          onChange={updateRange}
+          aria-valuetext={`${value.toFixed(precision)} ${metric.unit}`}
+        />
+      </label>
+
+      <footer id={`${metric.id}-description`}>
+        <span>{metric.description}</span>
+        <b>
+          {metric.id === "rir" ? `RPE ${10 - value}` : `${metric.min}–${metric.max}`}
+        </b>
       </footer>
     </article>
   );

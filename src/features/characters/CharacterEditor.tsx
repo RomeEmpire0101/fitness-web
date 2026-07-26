@@ -2,8 +2,6 @@
 
 import {
   RotateCcw,
-  Ruler,
-  Scale,
   SlidersHorizontal,
   X,
 } from "lucide-react";
@@ -19,7 +17,6 @@ import {
   CHARACTER_APPEARANCE_OPTIONS,
   CHARACTER_MEASUREMENTS,
 } from "./config";
-import { deriveCharacterMorphology } from "./morphology";
 import {
   CharacterMeasurementDefinition,
   CharacterMeasurementId,
@@ -35,7 +32,6 @@ type CharacterEditorProps = {
     id: CharacterMeasurementId,
     value: number,
   ) => void;
-  onNameChange: (name: string) => void;
   onBodyColorChange: (color: string) => void;
   onReset: () => void;
 };
@@ -46,11 +42,6 @@ type MeasurementControlProps = {
   onChange: (value: number) => void;
 };
 
-const MEASUREMENT_ICONS = {
-  heightCm: Ruler,
-  weightKg: Scale,
-} satisfies Record<CharacterMeasurementId, typeof Ruler>;
-
 function MeasurementControl({
   definition,
   value,
@@ -58,9 +49,9 @@ function MeasurementControl({
 }: MeasurementControlProps) {
   const editing = useRef(false);
   const [draft, setDraft] = useState(String(value));
-  const Icon = MEASUREMENT_ICONS[definition.id];
   const progress =
     ((value - definition.min) / (definition.max - definition.min)) * 100;
+  const numberId = `character-${definition.id}-number`;
 
   useEffect(() => {
     if (!editing.current) setDraft(String(value));
@@ -70,6 +61,7 @@ function MeasurementControl({
     const nextDraft = event.target.value;
     setDraft(nextDraft);
     const next = Number(nextDraft);
+
     if (
       nextDraft !== "" &&
       Number.isFinite(next) &&
@@ -86,6 +78,7 @@ function MeasurementControl({
     const next = Number.isFinite(parsed)
       ? Math.min(definition.max, Math.max(definition.min, parsed))
       : value;
+
     onChange(next);
     setDraft(String(next));
   };
@@ -95,21 +88,14 @@ function MeasurementControl({
   };
 
   return (
-    <div
-      className={styles.measurement}
-      style={{ "--character-progress": `${progress}%` } as CSSProperties}
-    >
+    <div className={styles.measurement}>
       <div className={styles.measurementHeader}>
-        <span className={styles.measurementIcon} aria-hidden="true">
-          <Icon size={15} />
-        </span>
-        <span>
-          <strong>{definition.label}</strong>
-          <small>{definition.description}</small>
-        </span>
-        <label className={styles.numberWrap}>
-          <span className="sr-only">{definition.label}</span>
+        <label className={styles.measurementLabel} htmlFor={numberId}>
+          {definition.shortLabel}
+        </label>
+        <div className={styles.numberWrap}>
           <input
+            id={numberId}
             type="number"
             min={definition.min}
             max={definition.max}
@@ -124,11 +110,14 @@ function MeasurementControl({
             onKeyDown={handleKeyDown}
           />
           <span>{definition.unit}</span>
-        </label>
+        </div>
       </div>
 
       <label className={styles.rangeWrap}>
-        <span className="sr-only">Adjust {definition.label}</span>
+        <span className={styles.srOnly}>Adjust {definition.label}</span>
+        <span className={styles.rangeTrack} aria-hidden="true">
+          <span style={{ width: `${progress}%` }} />
+        </span>
         <input
           type="range"
           min={definition.min}
@@ -148,17 +137,16 @@ export function CharacterEditor({
   open,
   onOpenChange,
   onMeasurementChange,
-  onNameChange,
   onBodyColorChange,
   onReset,
 }: CharacterEditorProps) {
-  const morphology = deriveCharacterMorphology(profile.measurements);
-
   useEffect(() => {
     if (!open) return;
+
     const closeOnEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key === "Escape") onOpenChange(false);
     };
+
     window.addEventListener("keydown", closeOnEscape);
     return () => window.removeEventListener("keydown", closeOnEscape);
   }, [onOpenChange, open]);
@@ -171,47 +159,26 @@ export function CharacterEditor({
         onClick={() => onOpenChange(!open)}
         aria-expanded={open}
         aria-controls="character-editor-panel"
+        aria-label="Character settings"
+        title="Character settings"
       >
-        <SlidersHorizontal size={15} />
-        <span>Edit character</span>
-        <small>
-          {profile.measurements.heightCm} cm · {profile.measurements.weightKg} kg
-        </small>
+        <SlidersHorizontal size={18} strokeWidth={1.8} />
       </button>
 
       {open && (
         <section
           id="character-editor-panel"
           className={styles.panel}
-          aria-labelledby="character-editor-title"
+          aria-label="Character settings"
         >
-          <header className={styles.panelHeader}>
-            <div>
-              <span className={styles.kicker}>Character profile</span>
-              <h2 id="character-editor-title">Shape your base model</h2>
-            </div>
-            <button
-              type="button"
-              className={styles.close}
-              onClick={() => onOpenChange(false)}
-              aria-label="Close character editor"
-            >
-              <X size={17} />
-            </button>
-          </header>
-
-          <label className={styles.nameField}>
-            <span>Character name</span>
-            <input
-              type="text"
-              value={profile.name}
-              maxLength={32}
-              onChange={(event) => onNameChange(event.target.value)}
-              onBlur={() => {
-                if (!profile.name.trim()) onNameChange("Athlete 01");
-              }}
-            />
-          </label>
+          <button
+            type="button"
+            className={styles.close}
+            onClick={() => onOpenChange(false)}
+            aria-label="Close character settings"
+          >
+            <X size={17} strokeWidth={1.8} />
+          </button>
 
           <div className={styles.measurements}>
             {CHARACTER_MEASUREMENTS.map((definition) => (
@@ -227,11 +194,12 @@ export function CharacterEditor({
           </div>
 
           <fieldset className={styles.finish}>
-            <legend>Model finish</legend>
+            <legend>Finish</legend>
             <div>
               {CHARACTER_APPEARANCE_OPTIONS.map((option) => {
                 const selected =
                   option.bodyColor === profile.appearance.bodyColor;
+
                 return (
                   <button
                     key={option.id}
@@ -250,15 +218,15 @@ export function CharacterEditor({
             </div>
           </fieldset>
 
-          <footer className={styles.panelFooter}>
-            <span>
-              Visual build <strong>{morphology.buildLabel}</strong>
-            </span>
-            <button type="button" onClick={onReset}>
-              <RotateCcw size={13} />
-              Reset character
-            </button>
-          </footer>
+          <button
+            type="button"
+            className={styles.panelReset}
+            onClick={onReset}
+            aria-label="Reset character"
+            title="Reset character"
+          >
+            <RotateCcw size={16} strokeWidth={1.8} />
+          </button>
         </section>
       )}
     </div>

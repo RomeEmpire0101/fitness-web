@@ -14,9 +14,17 @@ import { SceneLighting } from "./SceneLighting";
 
 export type CharacterSceneProps = CharacterVisualization & {
   profile: CharacterProfile;
+  compact?: boolean;
+  interactive?: boolean;
 };
 
-function AdaptiveCamera({ profile }: { profile: CharacterProfile }) {
+function AdaptiveCamera({
+  profile,
+  compact,
+}: {
+  profile: CharacterProfile;
+  compact: boolean;
+}) {
   const morphology = useMemo(
     () => deriveCharacterMorphology(profile.measurements),
     [profile.measurements],
@@ -25,7 +33,7 @@ function AdaptiveCamera({ profile }: { profile: CharacterProfile }) {
   useFrame(({ camera }, delta) => {
     camera.position.z = THREE.MathUtils.damp(
       camera.position.z,
-      morphology.cameraDistance,
+      morphology.cameraDistance + (compact ? 0.7 : 0),
       5,
       delta,
     );
@@ -35,11 +43,17 @@ function AdaptiveCamera({ profile }: { profile: CharacterProfile }) {
 }
 
 export default function CharacterScene(props: CharacterSceneProps) {
+  const compact = props.compact ?? false;
+  const interactive = props.interactive ?? true;
+
   return (
     <Canvas
       aria-hidden="true"
       dpr={[1, 1.75]}
-      camera={{ position: [0, 0.13, 9.25], fov: 32 }}
+      camera={{
+        position: [0, compact ? 0.16 : 0.13, compact ? 10.8 : 10.3],
+        fov: compact ? 34 : 32,
+      }}
       shadows
       gl={{
         antialias: true,
@@ -53,7 +67,7 @@ export default function CharacterScene(props: CharacterSceneProps) {
         </div>
       }
     >
-      <AdaptiveCamera profile={props.profile} />
+      <AdaptiveCamera profile={props.profile} compact={compact} />
       <SceneLighting />
       <RegisteredCharacterModel {...props} />
       <ContactShadows
@@ -64,19 +78,21 @@ export default function CharacterScene(props: CharacterSceneProps) {
         far={4}
         color="#000000"
       />
-      <OrbitControls
-        makeDefault
-        enablePan={false}
-        enableZoom={false}
-        minPolarAngle={Math.PI / 2 - 0.16}
-        maxPolarAngle={Math.PI / 2 + 0.16}
-        minAzimuthAngle={-0.65}
-        maxAzimuthAngle={0.65}
-        rotateSpeed={0.38}
-        dampingFactor={0.06}
-        enableDamping
-        target={[0, 0.05, 0]}
-      />
+      {interactive && (
+        <OrbitControls
+          makeDefault
+          enablePan={false}
+          enableZoom={false}
+          minPolarAngle={Math.PI / 2 - 0.16}
+          maxPolarAngle={Math.PI / 2 + 0.16}
+          minAzimuthAngle={-0.65}
+          maxAzimuthAngle={0.65}
+          rotateSpeed={0.38}
+          dampingFactor={0.06}
+          enableDamping
+          target={[0, 0.05, 0]}
+        />
+      )}
     </Canvas>
   );
 }

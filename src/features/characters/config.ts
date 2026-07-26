@@ -5,7 +5,7 @@ import {
   CharacterProfile,
 } from "./types";
 
-export const CHARACTER_STORAGE_KEY = "formforge:character:v1";
+export const CHARACTER_STORAGE_KEY = "physique:character:v2";
 
 export const CHARACTER_MEASUREMENTS: CharacterMeasurementDefinition[] = [
   {
@@ -47,7 +47,7 @@ export const DEFAULT_CHARACTER_PROFILE: CharacterProfile = {
   },
   appearance: {
     bodyColor: CHARACTER_APPEARANCE_OPTIONS[0].bodyColor,
-    accentColor: "#caff55",
+    accentColor: "#8c99a8",
   },
 };
 
@@ -94,10 +94,6 @@ export function normalizeCharacterProfile(
     typeof appearance.bodyColor === "string"
       ? appearance.bodyColor
       : fallback.appearance.bodyColor;
-  const accentColor =
-    typeof appearance.accentColor === "string"
-      ? appearance.accentColor
-      : fallback.appearance.accentColor;
 
   return {
     id: typeof partial.id === "string" ? partial.id : fallback.id,
@@ -121,7 +117,7 @@ export function normalizeCharacterProfile(
     },
     appearance: {
       bodyColor,
-      accentColor,
+      accentColor: fallback.appearance.accentColor,
     },
   };
 }

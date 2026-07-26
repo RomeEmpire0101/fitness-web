@@ -1,206 +1,254 @@
 "use client";
 
-import { Info, Rotate3D, RotateCcw } from "lucide-react";
-import { useMemo, useState } from "react";
 import {
-  CharacterEditor,
-  useCharacterProfile,
-} from "@/features/characters";
-import CharacterScene from "@/features/characters/scene/CharacterScene";
+  Bell,
+  CalendarRange,
+  FlaskConical,
+  Home,
+  Menu,
+  NotebookPen,
+  Search,
+  Settings,
+  Sparkles,
+  X,
+} from "lucide-react";
+import { useMemo, useState } from "react";
+import { useCharacterProfile } from "@/features/characters";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
+  cloneScenario,
   derivePhysique,
-  INITIAL_VALUES,
-  METRICS,
-  MetricId,
-  SimulationValues,
+  INITIAL_SCENARIOS,
+  PhysiqueResult,
+  Scenario,
 } from "@/lib/simulation";
-import { GuideDialog } from "./lab/GuideDialog";
-import { MetricCard } from "./lab/MetricCard";
-import { ResultPanel } from "./lab/ResultPanel";
+import { TodayDashboard } from "./dashboard/TodayDashboard";
+import { LabScreen } from "./lab/LabScreen";
+import { LogScreen } from "./log/LogScreen";
+import { PlanScreen } from "./plan/PlanScreen";
+
+type AppView = "today" | "lab" | "plan" | "log";
+
+const NAVIGATION: Array<{
+  id: AppView;
+  label: string;
+  Icon: typeof Home;
+}> = [
+  { id: "today", label: "Today", Icon: Home },
+  { id: "lab", label: "Physique Lab", Icon: FlaskConical },
+  { id: "plan", label: "Plan", Icon: CalendarRange },
+  { id: "log", label: "Workout Log", Icon: NotebookPen },
+];
+
+const createInitialScenarios = () =>
+  INITIAL_SCENARIOS.map((scenario) => cloneScenario(scenario));
 
 export function FitnessLab() {
-  const [values, setValues] = useState<SimulationValues>(INITIAL_VALUES);
-  const [activeMetric, setActiveMetric] = useState<MetricId | null>("protein");
-  const [guideOpen, setGuideOpen] = useState(false);
+  const [view, setView] = useState<AppView>("today");
+  const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
+  const [scenarios, setScenarios] =
+    useState<Scenario[]>(createInitialScenarios);
+  const [activeScenarioId, setActiveScenarioId] =
+    useState<Scenario["id"]>("scenario-a");
   const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
   const reducedMotion = useReducedMotion();
-  const result = useMemo(() => derivePhysique(values), [values]);
   const {
     profile,
     updateMeasurement,
-    updateName,
     updateBodyColor,
     resetProfile,
   } = useCharacterProfile();
 
-  const changeMetric = (id: MetricId, next: number) => {
-    const definition = METRICS.find((metric) => metric.id === id);
-    if (!definition) return;
-    const stepped =
-      Math.round(next / definition.step) * definition.step;
-    const clamped = Math.min(
-      definition.max,
-      Math.max(definition.min, stepped),
+  const results = useMemo(
+    () =>
+      scenarios.reduce((resultMap, scenario) => {
+        resultMap[scenario.id] = derivePhysique(scenario);
+        return resultMap;
+      }, {} as Record<Scenario["id"], PhysiqueResult>),
+    [scenarios],
+  );
+
+  const activeScenario =
+    scenarios.find((scenario) => scenario.id === activeScenarioId) ??
+    scenarios[0];
+  const activeResult = results[activeScenario.id];
+
+  const navigate = (nextView: AppView) => {
+    setView(nextView);
+    setMobileNavigationOpen(false);
+    window.requestAnimationFrame(() => {
+      document.querySelector(".app-content")?.scrollTo({ top: 0 });
+    });
+  };
+
+  const updateScenario = (
+    id: Scenario["id"],
+    update: (scenario: Scenario) => Scenario,
+  ) => {
+    setScenarios((current) =>
+      current.map((scenario) =>
+        scenario.id === id ? update(scenario) : scenario,
+      ),
     );
-    setValues((current) => ({ ...current, [id]: clamped }));
-    setActiveMetric(id);
   };
 
-  const reset = () => {
-    setValues(INITIAL_VALUES);
-    setActiveMetric(null);
-    resetProfile();
+  const resetScenarios = () => {
+    setScenarios(createInitialScenarios());
+    setActiveScenarioId("scenario-a");
   };
-
-  const leftMetrics = METRICS.slice(0, 2);
-  const rightMetrics = METRICS.slice(2);
 
   return (
-    <div className="lab-page">
-      <div className="ambient ambient--one" />
-      <div className="ambient ambient--two" />
-
-      <header className="topbar">
-        <a className="brand" href="#lab" aria-label="FormForge home">
-          <span className="brand-mark" aria-hidden="true">
+    <div className="fitness-app">
+      <aside
+        className={`app-sidebar ${
+          mobileNavigationOpen ? "is-mobile-open" : ""
+        }`}
+      >
+        <header className="app-brand">
+          <span aria-hidden="true">
+            <i />
             <i />
             <i />
           </span>
-          <span>
+          <div>
             <strong>FORMFORGE</strong>
-            <small>Body progression lab</small>
-          </span>
-        </a>
-
-        <div className="topbar-status" aria-label="Simulation status">
-          <i />
-          Model responding live
-        </div>
-
-        <nav aria-label="Page actions">
-          <button className="topbar-button" onClick={() => setGuideOpen(true)}>
-            <Info size={16} />
-            <span>How it works</span>
-          </button>
-          <button className="reset-button" onClick={reset}>
-            <RotateCcw size={15} />
-            Reset
-          </button>
-        </nav>
-      </header>
-
-      <main id="lab">
-        <div className="intro">
-          <p className="eyebrow">
-            <span>Interactive study 01</span>
-            <i />
-            Adaptation engine
-          </p>
-          <h1>
-            Shape the inputs.
-            <span>Watch the form respond.</span>
-          </h1>
-          <p className="intro-copy">
-            Tune the training variables and your character’s base measurements
-            to explore an evolving, editable physique model.
-          </p>
-        </div>
-
-        <div className="lab-layout">
-          <aside
-            className="metric-stack metric-stack--left"
-            aria-label="Nutrition and volume controls"
+            <small>Adaptive fitness studio</small>
+          </div>
+          <button
+            type="button"
+            className="mobile-nav-close"
+            aria-label="Close navigation"
+            onClick={() => setMobileNavigationOpen(false)}
           >
-            {leftMetrics.map((metric) => (
-              <MetricCard
-                key={metric.id}
-                metric={metric}
-                value={values[metric.id]}
-                isActive={activeMetric === metric.id}
-                onChange={changeMetric}
-                onActivate={setActiveMetric}
-              />
-            ))}
-          </aside>
+            <X size={18} />
+          </button>
+        </header>
 
-          <section
-            className="model-stage"
-            aria-label="Interactive character visualization"
-          >
-            <div className="stage-grid" aria-hidden="true" />
-            <div className="stage-orbit stage-orbit--outer" aria-hidden="true" />
-            <div className="stage-orbit stage-orbit--inner" aria-hidden="true" />
-            <div className="stage-label stage-label--top">
-              <span>FORM / 01</span>
-              <b>{result.stage}</b>
-            </div>
-            <div className="stage-label stage-label--side">
-              <span>{profile.name || "Athlete 01"} / adaptive morphology</span>
-            </div>
-            <div className="canvas-wrap">
-              <CharacterScene
-                profile={profile}
-                growth={result.growth}
-                definition={result.definition}
-                stimulus={result.stimulus}
-                reducedMotion={reducedMotion}
-              />
-            </div>
-            <CharacterEditor
-              profile={profile}
-              open={characterEditorOpen}
-              onOpenChange={setCharacterEditorOpen}
-              onMeasurementChange={updateMeasurement}
-              onNameChange={updateName}
-              onBodyColorChange={updateBodyColor}
-              onReset={resetProfile}
-            />
-            {!characterEditorOpen && (
-              <div className="orbit-hint">
-                <Rotate3D size={15} />
-                Drag to inspect
-              </div>
-            )}
-            <div
-              className="screenreader-summary sr-only"
-              aria-live="polite"
+        <nav className="app-navigation" aria-label="Main application">
+          <span>Workspace</span>
+          {NAVIGATION.map(({ id, label, Icon }) => (
+            <button
+              key={id}
+              type="button"
+              className={view === id ? "is-active" : ""}
+              aria-current={view === id ? "page" : undefined}
+              onClick={() => navigate(id)}
             >
-              {profile.name || "Athlete 01"}, {profile.measurements.heightCm}{" "}
-              centimeters and {profile.measurements.weightKg} kilograms.
-              Adaptation signal {result.adaptation} percent. {result.status}{" "}
-              over {values.weeks} weeks.
-            </div>
-          </section>
+              <Icon size={18} strokeWidth={1.9} />
+              <span>{label}</span>
+              {id === "log" && <i>Live</i>}
+            </button>
+          ))}
+        </nav>
 
-          <aside
-            className="metric-stack metric-stack--right"
-            aria-label="Intensity and time controls"
-          >
-            {rightMetrics.map((metric) => (
-              <MetricCard
-                key={metric.id}
-                metric={metric}
-                value={values[metric.id]}
-                isActive={activeMetric === metric.id}
-                onChange={changeMetric}
-                onActivate={setActiveMetric}
-              />
-            ))}
-          </aside>
+        <div className="sidebar-lab-note">
+          <span>
+            <Sparkles size={14} />
+          </span>
+          <p>
+            <strong>Scenario mode</strong>
+            <small>Explore relationships, not exact predictions.</small>
+          </p>
         </div>
 
-        <ResultPanel result={result} reducedMotion={reducedMotion} />
-
-        <footer className="page-footer">
-          <p>
-            A visual simulation for exploration—not a physiological prediction.
-          </p>
-          <span>FORMFORGE / 2026</span>
+        <footer className="sidebar-footer">
+          <button type="button">
+            <Settings size={18} />
+            <span>Settings</span>
+          </button>
+          <div className="sidebar-profile">
+            <span>{profile.name.slice(0, 2).toUpperCase()}</span>
+            <p>
+              <strong>{profile.name}</strong>
+              <small>Intermediate · Build</small>
+            </p>
+          </div>
         </footer>
-      </main>
+      </aside>
 
-      {guideOpen && <GuideDialog onClose={() => setGuideOpen(false)} />}
+      {mobileNavigationOpen && (
+        <button
+          className="mobile-nav-backdrop"
+          type="button"
+          aria-label="Close navigation"
+          onClick={() => setMobileNavigationOpen(false)}
+        />
+      )}
+
+      <div className="app-column">
+        <header className="app-topbar">
+          <button
+            type="button"
+            className="mobile-menu-button"
+            aria-label="Open navigation"
+            onClick={() => setMobileNavigationOpen(true)}
+          >
+            <Menu size={19} />
+          </button>
+          <div className="mobile-brand">FORMFORGE</div>
+          <label className="app-search">
+            <Search size={16} />
+            <span className="sr-only">Search FormForge</span>
+            <input
+              type="search"
+              placeholder="Search exercises, plans, or insights"
+            />
+            <kbd>⌘ K</kbd>
+          </label>
+          <div className="topbar-actions">
+            <button type="button" aria-label="Notifications">
+              <Bell size={17} />
+              <i />
+            </button>
+            <span className="topbar-scenario">
+              <i />
+              {activeScenario.name}
+            </span>
+          </div>
+        </header>
+
+        <main className="app-content">
+          {view === "today" && (
+            <TodayDashboard
+              scenario={activeScenario}
+              result={activeResult}
+              profile={profile}
+              reducedMotion={reducedMotion}
+              onNavigate={navigate}
+            />
+          )}
+
+          {view === "lab" && (
+            <LabScreen
+              scenarios={scenarios}
+              results={results}
+              activeScenarioId={activeScenarioId}
+              profile={profile}
+              reducedMotion={reducedMotion}
+              onActiveScenarioChange={setActiveScenarioId}
+              onScenarioChange={updateScenario}
+              onResetScenarios={resetScenarios}
+              characterEditorOpen={characterEditorOpen}
+              onCharacterEditorOpenChange={setCharacterEditorOpen}
+              onMeasurementChange={updateMeasurement}
+              onBodyColorChange={updateBodyColor}
+              onResetCharacter={resetProfile}
+            />
+          )}
+
+          {view === "plan" && (
+            <PlanScreen
+              scenario={activeScenario}
+              onScenarioChange={(update) =>
+                updateScenario(activeScenario.id, update)
+              }
+              onOpenLog={() => navigate("log")}
+            />
+          )}
+
+          {view === "log" && <LogScreen scenario={activeScenario} />}
+        </main>
+      </div>
     </div>
   );
 }

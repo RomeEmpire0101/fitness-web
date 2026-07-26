@@ -16,7 +16,7 @@ import {
   CharacterProfile,
 } from "./types";
 
-const CHARACTER_CHANGE_EVENT = "formforge:character-change";
+const CHARACTER_CHANGE_EVENT = "physique:character-change";
 const DEFAULT_SNAPSHOT = JSON.stringify(createDefaultCharacter());
 let memorySnapshot = DEFAULT_SNAPSHOT;
 

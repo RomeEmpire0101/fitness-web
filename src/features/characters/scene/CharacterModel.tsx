@@ -1,7 +1,7 @@
 "use client";
 
 import { useFrame } from "@react-three/fiber";
-import { useEffect, useMemo, useRef } from "react";
+import { useMemo, useRef } from "react";
 import * as THREE from "three";
 import { deriveCharacterMorphology } from "../morphology";
 import {
@@ -27,11 +27,10 @@ export function CharacterModel({
   growth,
   definition,
   stimulus,
+  muscleSignals,
   reducedMotion,
 }: CharacterModelProps) {
   const root = useRef<THREE.Group>(null);
-  const aura = useRef<THREE.Mesh>(null);
-  const auraMaterial = useRef<THREE.MeshBasicMaterial>(null);
 
   const bodyScale = useRef<THREE.Group>(null);
   const breath = useRef<THREE.Group>(null);
@@ -82,15 +81,6 @@ export function CharacterModel({
   const currentStimulus = useRef(stimulus);
   const currentHeight = useRef(morphology.heightScale);
   const currentWidth = useRef(morphology.widthScale);
-  const previousStimulus = useRef(stimulus);
-  const pulse = useRef(0);
-
-  useEffect(() => {
-    if (Math.abs(stimulus - previousStimulus.current) > 0.018) {
-      pulse.current = 1;
-      previousStimulus.current = stimulus;
-    }
-  }, [stimulus]);
 
   useFrame(({ clock }, delta) => {
     const g = damp(currentGrowth.current, growth, 4.8, delta);
@@ -113,7 +103,6 @@ export function CharacterModel({
     currentStimulus.current = s;
     currentHeight.current = height;
     currentWidth.current = width;
-    pulse.current = Math.max(0, pulse.current - delta * 1.7);
 
     const elapsed = clock.getElapsedTime();
     const inhale = reducedMotion ? 0 : Math.sin(elapsed * 1.72) * 0.5 + 0.5;
@@ -132,96 +121,84 @@ export function CharacterModel({
       breath.current.scale.z = 1 + inhale * 0.014;
     }
 
+    const signal = (id: keyof NonNullable<typeof muscleSignals>) =>
+      muscleSignals?.[id] ?? g;
+    const chestSignal = (signal("chest") + signal("back")) / 2;
+    const shoulderSignal = signal("shoulders");
+    const armSignal = (signal("biceps") + signal("triceps")) / 2;
+    const thighSignal =
+      (signal("quads") + signal("hamstrings") + signal("glutes")) / 3;
+    const calfSignal = signal("calves");
+
     chest.current?.scale.set(
-      0.73 * (1 + g * 0.2),
+      0.73 * (1 + g * (0.12 + chestSignal * 0.12)),
       0.73 * (1 + g * 0.025),
-      0.36 * (1 + g * 0.18),
+      0.36 * (1 + g * (0.1 + chestSignal * 0.12)),
     );
     upperChest.current?.scale.set(
-      0.78 * (1 + g * 0.24),
+      0.78 * (1 + g * (0.12 + chestSignal * 0.16)),
       0.46 * (1 + g * 0.04),
-      0.36 * (1 + g * 0.2),
+      0.36 * (1 + g * (0.1 + chestSignal * 0.14)),
     );
     waist.current?.scale.set(1 + g * 0.1, 1, 1 + g * 0.08);
 
-    const shoulderOffset = 0.755 + g * 0.115;
+    const shoulderOffset = 0.755 + g * (0.065 + shoulderSignal * 0.07);
     if (leftShoulder.current) {
       leftShoulder.current.position.x = -shoulderOffset;
-      leftShoulder.current.scale.setScalar(0.28 * (1 + g * 0.32));
+      leftShoulder.current.scale.setScalar(
+        0.28 * (1 + g * (0.18 + shoulderSignal * 0.2)),
+      );
     }
     if (rightShoulder.current) {
       rightShoulder.current.position.x = shoulderOffset;
-      rightShoulder.current.scale.setScalar(0.28 * (1 + g * 0.32));
+      rightShoulder.current.scale.setScalar(
+        0.28 * (1 + g * (0.18 + shoulderSignal * 0.2)),
+      );
     }
     if (leftArm.current) leftArm.current.position.x = -shoulderOffset;
     if (rightArm.current) rightArm.current.position.x = shoulderOffset;
 
     leftUpperArm.current?.scale.set(
-      1 + g * 0.38,
+      1 + g * (0.2 + armSignal * 0.24),
       1 + g * 0.035,
-      1 + g * 0.38,
+      1 + g * (0.2 + armSignal * 0.24),
     );
     if (leftUpperArm.current && rightUpperArm.current) {
       rightUpperArm.current.scale.copy(leftUpperArm.current.scale);
     }
     leftForearm.current?.scale.set(
-      1 + g * 0.24,
+      1 + g * (0.14 + armSignal * 0.15),
       1 + g * 0.02,
-      1 + g * 0.24,
+      1 + g * (0.14 + armSignal * 0.15),
     );
     if (leftForearm.current && rightForearm.current) {
       rightForearm.current.scale.copy(leftForearm.current.scale);
     }
     leftThigh.current?.scale.set(
-      1 + g * 0.3,
+      1 + g * (0.16 + thighSignal * 0.2),
       1 + g * 0.035,
-      1 + g * 0.3,
+      1 + g * (0.16 + thighSignal * 0.2),
     );
     if (leftThigh.current && rightThigh.current) {
       rightThigh.current.scale.copy(leftThigh.current.scale);
     }
     leftCalf.current?.scale.set(
-      1 + g * 0.25,
+      1 + g * (0.14 + calfSignal * 0.17),
       1 + g * 0.025,
-      1 + g * 0.25,
+      1 + g * (0.14 + calfSignal * 0.17),
     );
     if (leftCalf.current && rightCalf.current) {
       rightCalf.current.scale.copy(leftCalf.current.scale);
     }
 
     if (contourMaterial.current) {
-      contourMaterial.current.opacity = 0.1 + d * 0.64;
-      contourMaterial.current.emissiveIntensity = 0.18 + d * 0.75;
-    }
-
-    if (aura.current) {
-      const pulseScale = 1 + pulse.current * 0.13;
-      const energyScale = (0.92 + s * 0.2) * pulseScale;
-      aura.current.scale.set(
-        energyScale * width,
-        energyScale * height,
-        energyScale,
-      );
-    }
-    if (auraMaterial.current) {
-      auraMaterial.current.opacity =
-        0.025 + s * 0.09 + pulse.current * 0.075;
+      contourMaterial.current.opacity = 0.08 + d * 0.38 + s * 0.12;
+      contourMaterial.current.emissiveIntensity = 0.08 + d * 0.28 + s * 0.16;
     }
   });
 
   return (
     <group ref={root} position={[0, -0.07, 0]}>
-      <mesh ref={aura} position={[0, 0.05, -0.62]} scale={0.95}>
-        <circleGeometry args={[2.35, 72]} />
-        <meshBasicMaterial
-          ref={auraMaterial}
-          color={profile.appearance.accentColor}
-          transparent
-          opacity={0.05}
-          depthWrite={false}
-          blending={THREE.AdditiveBlending}
-        />
-      </mesh>
       <CharacterBody appearance={profile.appearance} rig={rig} />
     </group>
   );

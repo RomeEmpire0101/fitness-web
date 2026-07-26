@@ -1,3 +1,5 @@
+import type { MuscleGroupId } from "@/lib/simulation";
+
 export type CharacterMeasurementId = "heightCm" | "weightKg";
 
 export type CharacterModelId = "adaptive-athlete";
@@ -38,5 +40,6 @@ export type CharacterVisualization = {
   growth: number;
   definition: number;
   stimulus: number;
+  muscleSignals?: Partial<Record<MuscleGroupId, number>>;
   reducedMotion: boolean;
 };

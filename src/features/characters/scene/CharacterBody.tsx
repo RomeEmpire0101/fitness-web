@@ -242,7 +242,7 @@ export function CharacterBody({ appearance, rig }: CharacterBodyProps) {
         >
           <capsuleGeometry args={[0.55, 0.7, 8, 16]} />
           <meshBasicMaterial
-            color="#ebffc0"
+            color="#f7fafc"
             transparent
             opacity={0.22}
             depthWrite={false}
@@ -255,7 +255,7 @@ export function CharacterBody({ appearance, rig }: CharacterBodyProps) {
         >
           <capsuleGeometry args={[0.55, 0.7, 8, 16]} />
           <meshBasicMaterial
-            color="#ebffc0"
+            color="#f7fafc"
             transparent
             opacity={0.22}
             depthWrite={false}
