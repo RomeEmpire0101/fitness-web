@@ -1,109 +1,156 @@
 "use client";
 
 import {
+  CalendarDays,
   Check,
   ChevronDown,
   Clock3,
   Dumbbell,
-  Ellipsis,
-  Flame,
   MessageSquareText,
-  Pause,
   Plus,
-  Sparkles,
-  TimerReset,
-  Trophy,
+  Square,
 } from "lucide-react";
-import { useMemo, useState } from "react";
-import { Scenario } from "@/lib/simulation";
+import { useEffect, useMemo, useState } from "react";
+import {
+  createId,
+  getNextPlanSession,
+  LoggedSet,
+  PlanSession,
+  WorkoutFeedback,
+  WorkoutSession,
+} from "@/lib/fitnessData";
+import { TrainingProgram } from "@/lib/simulation";
 
 type LogScreenProps = {
-  scenario: Scenario;
+  program: TrainingProgram;
+  sessions: PlanSession[];
+  workouts: WorkoutSession[];
+  onWorkoutsChange: (
+    update: (workouts: WorkoutSession[]) => WorkoutSession[],
+  ) => void;
+  onOpenPlan: () => void;
 };
 
-type LoggedSet = {
-  id: string;
-  previous: string;
-  weight: number;
-  reps: number;
-  rir: number;
-  complete: boolean;
-};
-
-type LoggedExercise = {
-  id: string;
-  name: string;
-  muscle: string;
-  note: string;
-  sets: LoggedSet[];
-};
-
-const INITIAL_EXERCISES: LoggedExercise[] = [
-  {
-    id: "bench",
-    name: "Barbell bench press",
-    muscle: "Chest · Triceps",
-    note: "Pause briefly on the chest. Keep one clean rep available.",
-    sets: [
-      { id: "bench-1", previous: "70 × 8", weight: 72.5, reps: 8, rir: 2, complete: true },
-      { id: "bench-2", previous: "70 × 8", weight: 72.5, reps: 8, rir: 2, complete: true },
-      { id: "bench-3", previous: "70 × 7", weight: 72.5, reps: 7, rir: 1, complete: false },
-    ],
-  },
-  {
-    id: "row",
-    name: "Chest-supported row",
-    muscle: "Back · Biceps",
-    note: "Lead with the elbows and keep the torso supported.",
-    sets: [
-      { id: "row-1", previous: "60 × 10", weight: 62.5, reps: 10, rir: 2, complete: true },
-      { id: "row-2", previous: "60 × 10", weight: 62.5, reps: 10, rir: 2, complete: false },
-      { id: "row-3", previous: "60 × 9", weight: 62.5, reps: 9, rir: 2, complete: false },
-      { id: "row-4", previous: "57.5 × 10", weight: 60, reps: 10, rir: 2, complete: false },
-    ],
-  },
-  {
-    id: "press",
-    name: "Seated shoulder press",
-    muscle: "Shoulders · Triceps",
-    note: "Stop before the lower back leaves the pad.",
-    sets: [
-      { id: "press-1", previous: "22 × 10", weight: 22, reps: 10, rir: 2, complete: false },
-      { id: "press-2", previous: "22 × 9", weight: 22, reps: 9, rir: 2, complete: false },
-      { id: "press-3", previous: "20 × 11", weight: 22, reps: 9, rir: 2, complete: false },
-    ],
-  },
+const DAY_LABELS = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
 ];
 
-export function LogScreen({ scenario }: LogScreenProps) {
-  const [exercises, setExercises] =
-    useState<LoggedExercise[]>(INITIAL_EXERCISES);
-  const [effortFeedback, setEffortFeedback] = useState<"easy" | "right" | "hard">(
-    "right",
-  );
+const formatElapsed = (seconds: number) => {
+  const hours = Math.floor(seconds / 3600);
+  const minutes = Math.floor((seconds % 3600) / 60);
+  const remainingSeconds = seconds % 60;
+  return [hours, minutes, remainingSeconds]
+    .map((value) => String(value).padStart(2, "0"))
+    .join(":");
+};
+
+export function LogScreen({
+  program,
+  sessions,
+  workouts,
+  onWorkoutsChange,
+  onOpenPlan,
+}: LogScreenProps) {
+  const activeWorkout = [...workouts]
+    .reverse()
+    .find((workout) => !workout.completedAt);
+  const nextSession = getNextPlanSession(sessions);
+  const [now, setNow] = useState(Date.now());
+
+  useEffect(() => {
+    if (!activeWorkout) return;
+    const timer = window.setInterval(() => setNow(Date.now()), 1000);
+    return () => window.clearInterval(timer);
+  }, [activeWorkout]);
+
+  const elapsedSeconds = activeWorkout
+    ? Math.max(
+        0,
+        Math.floor(
+          (now - new Date(activeWorkout.startedAt).getTime()) / 1000,
+        ),
+      )
+    : 0;
 
   const summary = useMemo(() => {
-    const sets = exercises.flatMap((exercise) => exercise.sets);
+    const sets =
+      activeWorkout?.exercises.flatMap((exercise) => exercise.sets) ?? [];
     const completed = sets.filter((set) => set.complete);
     const volume = completed.reduce(
-      (total, set) => total + set.weight * set.reps,
+      (total, set) =>
+        total +
+        (typeof set.weight === "number" ? set.weight : 0) *
+          (typeof set.reps === "number" ? set.reps : 0),
       0,
     );
     return {
       total: sets.length,
       completed: completed.length,
       volume: Math.round(volume),
-      percent: Math.round((completed.length / Math.max(1, sets.length)) * 100),
+      percent:
+        sets.length === 0
+          ? 0
+          : Math.round((completed.length / sets.length) * 100),
     };
-  }, [exercises]);
+  }, [activeWorkout]);
+
+  const startWorkout = () => {
+    if (!nextSession || nextSession.exercises.length === 0) return;
+
+    const workout: WorkoutSession = {
+      id: createId("workout"),
+      planSessionId: nextSession.id,
+      title: nextSession.title,
+      startedAt: new Date().toISOString(),
+      completedAt: null,
+      feedback: null,
+      exercises: nextSession.exercises.map((exercise) => ({
+        id: createId("logged-exercise"),
+        planExerciseId: exercise.id,
+        name: exercise.name,
+        muscle: exercise.muscle,
+        sets: Array.from(
+          { length: Math.max(1, exercise.sets) },
+          () => ({
+            id: createId("set"),
+            weight: "",
+            reps: "",
+            rir: program.values.rir,
+            complete: false,
+          }),
+        ),
+      })),
+    };
+
+    onWorkoutsChange((current) => [...current, workout]);
+    setNow(Date.now());
+  };
+
+  const updateWorkout = (
+    update: (workout: WorkoutSession) => WorkoutSession,
+  ) => {
+    if (!activeWorkout) return;
+    onWorkoutsChange((current) =>
+      current.map((workout) =>
+        workout.id === activeWorkout.id ? update(workout) : workout,
+      ),
+    );
+  };
 
   const updateSet = (
     exerciseId: string,
     setId: string,
     update: Partial<LoggedSet>,
   ) => {
-    setExercises((current) =>
-      current.map((exercise) =>
+    updateWorkout((workout) => ({
+      ...workout,
+      exercises: workout.exercises.map((exercise) =>
         exercise.id === exerciseId
           ? {
               ...exercise,
@@ -113,160 +160,329 @@ export function LogScreen({ scenario }: LogScreenProps) {
             }
           : exercise,
       ),
-    );
+    }));
   };
 
   const addSet = (exerciseId: string) => {
-    setExercises((current) =>
-      current.map((exercise) => {
+    updateWorkout((workout) => ({
+      ...workout,
+      exercises: workout.exercises.map((exercise) => {
         if (exercise.id !== exerciseId) return exercise;
-        const previous = exercise.sets[exercise.sets.length - 1];
+        const previous = exercise.sets.at(-1);
         return {
           ...exercise,
           sets: [
             ...exercise.sets,
             {
-              id: `${exerciseId}-${exercise.sets.length + 1}`,
-              previous: "—",
-              weight: previous?.weight ?? 20,
-              reps: previous?.reps ?? 10,
-              rir: scenario.values.rir,
+              id: createId("set"),
+              weight: previous?.weight ?? "",
+              reps: previous?.reps ?? "",
+              rir: previous?.rir ?? program.values.rir,
               complete: false,
             },
           ],
         };
       }),
-    );
+    }));
   };
+
+  const setFeedback = (feedback: WorkoutFeedback) => {
+    updateWorkout((workout) => ({ ...workout, feedback }));
+  };
+
+  const finishWorkout = () => {
+    updateWorkout((workout) => ({
+      ...workout,
+      completedAt: new Date().toISOString(),
+    }));
+  };
+
+  const previousCompletedWorkout = activeWorkout
+    ? [...workouts]
+        .reverse()
+        .find(
+          (workout) =>
+            workout.completedAt &&
+            workout.planSessionId === activeWorkout.planSessionId,
+        )
+    : undefined;
+
+  if (!activeWorkout) {
+    const canStart = Boolean(nextSession?.exercises.length);
+
+    return (
+      <div className="log-screen screen-enter">
+        <header className="screen-heading log-heading">
+          <div>
+            <span className="eyebrow">Workout log</span>
+            <h1>No workout in progress</h1>
+            <p>
+              Start a saved plan session to record your actual sets, reps,
+              weight, and effort.
+            </p>
+          </div>
+        </header>
+
+        <section className="panel-card data-empty-state data-empty-state--large">
+          <CalendarDays size={26} />
+          {nextSession ? (
+            <>
+              <h2>{nextSession.title || "Untitled session"}</h2>
+              <p>
+                {DAY_LABELS[nextSession.dayIndex]} ·{" "}
+                {nextSession.exercises.length} exercises
+              </p>
+              <button
+                type="button"
+                className="primary-button"
+                disabled={!canStart}
+                onClick={startWorkout}
+              >
+                <Dumbbell size={15} />
+                Start this session
+              </button>
+              {!canStart && (
+                <button
+                  type="button"
+                  className="secondary-button"
+                  onClick={onOpenPlan}
+                >
+                  Add exercises in Plan
+                </button>
+              )}
+            </>
+          ) : (
+            <>
+              <h2>Your plan is empty</h2>
+              <p>Add a session and its exercises before starting a workout.</p>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={onOpenPlan}
+              >
+                Create a plan
+              </button>
+            </>
+          )}
+        </section>
+
+        {workouts.some((workout) => workout.completedAt) && (
+          <section className="panel-card workout-history">
+            <header className="panel-card__header">
+              <div>
+                <span className="eyebrow">Recorded data</span>
+                <h2>Workout history</h2>
+              </div>
+            </header>
+            <div>
+              {workouts
+                .filter((workout) => workout.completedAt)
+                .reverse()
+                .map((workout) => (
+                  <article key={workout.id}>
+                    <p>
+                      <strong>{workout.title || "Untitled session"}</strong>
+                      <small>
+                        {new Intl.DateTimeFormat(undefined, {
+                          dateStyle: "medium",
+                          timeStyle: "short",
+                        }).format(new Date(workout.startedAt))}
+                      </small>
+                    </p>
+                    <span>
+                      {workout.exercises.reduce(
+                        (total, exercise) =>
+                          total +
+                          exercise.sets.filter((set) => set.complete).length,
+                        0,
+                      )}{" "}
+                      sets
+                    </span>
+                  </article>
+                ))}
+            </div>
+          </section>
+        )}
+      </div>
+    );
+  }
 
   return (
     <div className="log-screen screen-enter">
       <header className="screen-heading log-heading">
         <div>
-          <span className="eyebrow">Live workout · Week 4</span>
-          <h1>Upper strength</h1>
-          <p>Chest, back and shoulders · Target {scenario.values.rir} RIR</p>
+          <span className="eyebrow">
+            Live workout ·{" "}
+            {new Intl.DateTimeFormat(undefined, {
+              weekday: "long",
+              month: "short",
+              day: "numeric",
+            }).format(new Date(activeWorkout.startedAt))}
+          </span>
+          <h1>{activeWorkout.title || "Untitled session"}</h1>
+          <p>
+            {activeWorkout.exercises
+              .map((exercise) => exercise.muscle)
+              .filter(Boolean)
+              .filter((muscle, index, all) => all.indexOf(muscle) === index)
+              .join(", ") || "No muscle focus added"}{" "}
+            · Target {program.values.rir} RIR
+          </p>
         </div>
         <div className="workout-timer">
           <span>
             <Clock3 size={15} />
-            32:18
+            {formatElapsed(elapsedSeconds)}
           </span>
-          <button type="button" aria-label="Pause workout timer">
-            <Pause size={16} />
+          <button
+            type="button"
+            aria-label="Finish workout"
+            title="Finish workout"
+            onClick={finishWorkout}
+          >
+            <Square size={14} />
           </button>
         </div>
       </header>
 
       <section className="log-layout">
         <div className="exercise-log-column">
-          {exercises.map((exercise, exerciseIndex) => (
-            <article key={exercise.id} className="exercise-log-card panel-card">
-              <header>
-                <span className="exercise-index">{exerciseIndex + 1}</span>
-                <div>
-                  <h2>{exercise.name}</h2>
-                  <p>{exercise.muscle}</p>
-                </div>
-                <button type="button" aria-label={`Options for ${exercise.name}`}>
-                  <Ellipsis size={18} />
-                </button>
-              </header>
+          {activeWorkout.exercises.map((exercise, exerciseIndex) => {
+            const previousExercise =
+              previousCompletedWorkout?.exercises.find(
+                (item) => item.planExerciseId === exercise.planExerciseId,
+              );
 
-              <div className="exercise-coach-note">
-                <Sparkles size={14} />
-                {exercise.note}
-              </div>
-
-              <div className="set-table">
-                <div className="set-table__head">
-                  <span>Set</span>
-                  <span>Previous</span>
-                  <span>kg</span>
-                  <span>Reps</span>
-                  <span>RIR</span>
-                  <span>Done</span>
-                </div>
-                {exercise.sets.map((set, setIndex) => (
-                  <div
-                    key={set.id}
-                    className={`set-row ${set.complete ? "is-complete" : ""}`}
-                  >
-                    <span>{setIndex + 1}</span>
-                    <span>{set.previous}</span>
-                    <label>
-                      <span className="sr-only">Weight for set {setIndex + 1}</span>
-                      <input
-                        type="number"
-                        step="0.5"
-                        value={set.weight}
-                        onChange={(event) =>
-                          updateSet(exercise.id, set.id, {
-                            weight: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    <label>
-                      <span className="sr-only">Reps for set {setIndex + 1}</span>
-                      <input
-                        type="number"
-                        min="1"
-                        value={set.reps}
-                        onChange={(event) =>
-                          updateSet(exercise.id, set.id, {
-                            reps: Number(event.target.value),
-                          })
-                        }
-                      />
-                    </label>
-                    <label className="rir-select">
-                      <span className="sr-only">RIR for set {setIndex + 1}</span>
-                      <select
-                        value={set.rir}
-                        onChange={(event) =>
-                          updateSet(exercise.id, set.id, {
-                            rir: Number(event.target.value),
-                          })
-                        }
-                      >
-                        {[0, 1, 2, 3, 4, 5].map((rir) => (
-                          <option key={rir} value={rir}>
-                            {rir}
-                          </option>
-                        ))}
-                      </select>
-                      <ChevronDown size={12} aria-hidden="true" />
-                    </label>
-                    <button
-                      type="button"
-                      className="set-complete-button"
-                      aria-label={`${set.complete ? "Mark incomplete" : "Complete"} set ${
-                        setIndex + 1
-                      }`}
-                      aria-pressed={set.complete}
-                      onClick={() =>
-                        updateSet(exercise.id, set.id, {
-                          complete: !set.complete,
-                        })
-                      }
-                    >
-                      <Check size={15} />
-                    </button>
-                  </div>
-                ))}
-              </div>
-
-              <button
-                type="button"
-                className="add-set-button"
-                onClick={() => addSet(exercise.id)}
+            return (
+              <article
+                key={exercise.id}
+                className="exercise-log-card panel-card"
               >
-                <Plus size={14} />
-                Add set
-              </button>
-            </article>
-          ))}
+                <header>
+                  <span className="exercise-index">{exerciseIndex + 1}</span>
+                  <div>
+                    <h2>{exercise.name || "Unnamed exercise"}</h2>
+                    <p>{exercise.muscle || "No muscle selected"}</p>
+                  </div>
+                </header>
+
+                <div className="set-table">
+                  <div className="set-table__head">
+                    <span>Set</span>
+                    <span>Previous</span>
+                    <span>kg</span>
+                    <span>Reps</span>
+                    <span>RIR</span>
+                    <span>Done</span>
+                  </div>
+                  {exercise.sets.map((set, setIndex) => {
+                    const previousSet = previousExercise?.sets[setIndex];
+                    const previous =
+                      previousSet &&
+                      typeof previousSet.weight === "number" &&
+                      typeof previousSet.reps === "number"
+                        ? `${previousSet.weight} × ${previousSet.reps}`
+                        : "—";
+
+                    return (
+                      <div
+                        key={set.id}
+                        className={`set-row ${
+                          set.complete ? "is-complete" : ""
+                        }`}
+                      >
+                        <span>{setIndex + 1}</span>
+                        <span>{previous}</span>
+                        <label>
+                          <span className="sr-only">
+                            Weight for set {setIndex + 1}
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            step="0.5"
+                            value={set.weight}
+                            placeholder="0"
+                            onChange={(event) =>
+                              updateSet(exercise.id, set.id, {
+                                weight:
+                                  event.target.value === ""
+                                    ? ""
+                                    : Number(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <label>
+                          <span className="sr-only">
+                            Reps for set {setIndex + 1}
+                          </span>
+                          <input
+                            type="number"
+                            min="0"
+                            value={set.reps}
+                            placeholder="0"
+                            onChange={(event) =>
+                              updateSet(exercise.id, set.id, {
+                                reps:
+                                  event.target.value === ""
+                                    ? ""
+                                    : Number(event.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                        <label className="rir-select">
+                          <span className="sr-only">
+                            RIR for set {setIndex + 1}
+                          </span>
+                          <select
+                            value={set.rir}
+                            onChange={(event) =>
+                              updateSet(exercise.id, set.id, {
+                                rir: Number(event.target.value),
+                              })
+                            }
+                          >
+                            {[0, 1, 2, 3, 4, 5].map((rir) => (
+                              <option key={rir} value={rir}>
+                                {rir}
+                              </option>
+                            ))}
+                          </select>
+                          <ChevronDown size={12} aria-hidden="true" />
+                        </label>
+                        <button
+                          type="button"
+                          className="set-complete-button"
+                          aria-label={`${
+                            set.complete ? "Mark incomplete" : "Complete"
+                          } set ${setIndex + 1}`}
+                          aria-pressed={set.complete}
+                          onClick={() =>
+                            updateSet(exercise.id, set.id, {
+                              complete: !set.complete,
+                            })
+                          }
+                        >
+                          <Check size={15} />
+                        </button>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <button
+                  type="button"
+                  className="add-set-button"
+                  onClick={() => addSet(exercise.id)}
+                >
+                  <Plus size={14} />
+                  Add set
+                </button>
+              </article>
+            );
+          })}
         </div>
 
         <aside className="workout-summary-column">
@@ -305,24 +521,9 @@ export function LogScreen({ scenario }: LogScreenProps) {
                 kg volume
               </span>
               <span>
-                <b>{scenario.values.rir}</b>
+                <b>{program.values.rir}</b>
                 target RIR
               </span>
-            </div>
-          </article>
-
-          <article className="rest-timer-card panel-card">
-            <span className="card-kicker">
-              <TimerReset size={14} />
-              Rest timer
-            </span>
-            <strong>01:24</strong>
-            <span className="rest-progress">
-              <i style={{ width: "62%" }} />
-            </span>
-            <div>
-              <button type="button">−15 sec</button>
-              <button type="button">+15 sec</button>
             </div>
           </article>
 
@@ -341,29 +542,27 @@ export function LogScreen({ scenario }: LogScreenProps) {
                 <button
                   key={id}
                   type="button"
-                  className={effortFeedback === id ? "is-active" : ""}
-                  onClick={() =>
-                    setEffortFeedback(id as "easy" | "right" | "hard")
+                  className={
+                    activeWorkout.feedback === id ? "is-active" : ""
                   }
+                  onClick={() => setFeedback(id as WorkoutFeedback)}
                 >
-                  {effortFeedback === id && <Check size={13} />}
+                  {activeWorkout.feedback === id && <Check size={13} />}
                   {label}
                 </button>
               ))}
             </div>
-            <p>This feedback can adjust the next week’s set recommendations.</p>
+            <p>Your response is stored with this workout.</p>
           </article>
 
-          <article className="personal-best-card">
-            <span>
-              <Trophy size={17} />
-            </span>
-            <p>
-              <strong>Potential volume best</strong>
-              <small>Complete 5 more sets to pass last week.</small>
-            </p>
-            <Flame size={17} />
-          </article>
+          <button
+            type="button"
+            className="primary-button finish-workout-button"
+            onClick={finishWorkout}
+          >
+            <Square size={14} />
+            Finish workout
+          </button>
         </aside>
       </section>
     </div>

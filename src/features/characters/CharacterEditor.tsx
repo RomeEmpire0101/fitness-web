@@ -28,6 +28,7 @@ type CharacterEditorProps = {
   profile: CharacterProfile;
   open: boolean;
   onOpenChange: (open: boolean) => void;
+  onNameChange: (name: string) => void;
   onMeasurementChange: (
     id: CharacterMeasurementId,
     value: number,
@@ -136,6 +137,7 @@ export function CharacterEditor({
   profile,
   open,
   onOpenChange,
+  onNameChange,
   onMeasurementChange,
   onBodyColorChange,
   onReset,
@@ -179,6 +181,17 @@ export function CharacterEditor({
           >
             <X size={17} strokeWidth={1.8} />
           </button>
+
+          <label className={styles.profileName}>
+            <span>Profile name</span>
+            <input
+              type="text"
+              value={profile.name}
+              maxLength={32}
+              placeholder="Enter your name"
+              onChange={(event) => onNameChange(event.target.value)}
+            />
+          </label>
 
           <div className={styles.measurements}>
             {CHARACTER_MEASUREMENTS.map((definition) => (

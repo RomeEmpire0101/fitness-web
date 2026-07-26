@@ -5,7 +5,7 @@ import {
   CharacterProfile,
 } from "./types";
 
-export const CHARACTER_STORAGE_KEY = "physique:character:v2";
+export const CHARACTER_STORAGE_KEY = "physique:character:v3";
 
 export const CHARACTER_MEASUREMENTS: CharacterMeasurementDefinition[] = [
   {
@@ -31,19 +31,23 @@ export const CHARACTER_MEASUREMENTS: CharacterMeasurementDefinition[] = [
 ];
 
 export const CHARACTER_APPEARANCE_OPTIONS: CharacterAppearanceOption[] = [
-  { id: "graphite", label: "Graphite", bodyColor: "#9fa9a0" },
-  { id: "bronze", label: "Bronze", bodyColor: "#a98c74" },
-  { id: "clay", label: "Clay", bodyColor: "#a97868" },
-  { id: "onyx", label: "Onyx", bodyColor: "#666e69" },
+  { id: "sand", label: "Sand", bodyColor: "#c98f72" },
+  { id: "olive", label: "Olive", bodyColor: "#ad7658" },
+  { id: "bronze", label: "Bronze", bodyColor: "#8f5d45" },
+  { id: "umber", label: "Umber", bodyColor: "#684334" },
 ];
 
 export const DEFAULT_CHARACTER_PROFILE: CharacterProfile = {
-  id: "athlete-01",
+  id: "local-profile",
   modelId: "adaptive-athlete",
-  name: "Athlete 01",
+  name: "",
   measurements: {
-    heightCm: 175,
-    weightKg: 75,
+    heightCm: Math.round(
+      (CHARACTER_MEASUREMENTS[0].min + CHARACTER_MEASUREMENTS[0].max) / 2,
+    ),
+    weightKg: Math.round(
+      (CHARACTER_MEASUREMENTS[1].min + CHARACTER_MEASUREMENTS[1].max) / 2,
+    ),
   },
   appearance: {
     bodyColor: CHARACTER_APPEARANCE_OPTIONS[0].bodyColor,
@@ -102,8 +106,8 @@ export function normalizeCharacterProfile(
         ? partial.modelId
         : fallback.modelId,
     name:
-      typeof partial.name === "string" && partial.name.trim()
-        ? partial.name.trim().slice(0, 32)
+      typeof partial.name === "string"
+        ? partial.name.slice(0, 32)
         : fallback.name,
     measurements: {
       heightCm: clampMeasurement(

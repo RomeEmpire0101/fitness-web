@@ -10,7 +10,7 @@ import "./globals.css";
 export const metadata: Metadata = {
   title: "FormForge — Adaptive Fitness Studio",
   description:
-    "A comprehensive fitness web app mockup for exploring training, nutrition, recovery, muscle priorities, and scenario comparisons.",
+    "A fitness studio for exploring training, nutrition, recovery, muscle priorities, and user-created workout plans.",
 };
 
 export const viewport: Viewport = {

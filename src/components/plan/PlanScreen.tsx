@@ -4,174 +4,161 @@ import {
   CalendarDays,
   Check,
   ChevronRight,
+  CircleOff,
   Clock3,
   Dumbbell,
   Plus,
   Settings2,
   Sparkles,
+  Target,
+  Trash2,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import {
+  createId,
+  PlanExercise,
+  PlanSession,
+} from "@/lib/fitnessData";
+import {
   EQUIPMENT_OPTIONS,
   MUSCLE_GROUPS,
-  Scenario,
+  TrainingProgram,
 } from "@/lib/simulation";
 
 type PlanScreenProps = {
-  scenario: Scenario;
-  onScenarioChange: (update: (scenario: Scenario) => Scenario) => void;
+  program: TrainingProgram;
+  sessions: PlanSession[];
+  onSessionsChange: (
+    update: (sessions: PlanSession[]) => PlanSession[],
+  ) => void;
+  onProgramChange: (
+    update: (program: TrainingProgram) => TrainingProgram,
+  ) => void;
   onOpenLog: () => void;
 };
-
-type Session = {
-  id: string;
-  title: string;
-  focus: string;
-  duration: number;
-  exercises: Array<{
-    name: string;
-    muscle: string;
-    sets: number;
-    reps: string;
-  }>;
-};
-
-const EXERCISES = {
-  upper: [
-    { name: "Bench press", muscle: "Chest", sets: 3, reps: "6–8" },
-    { name: "Chest-supported row", muscle: "Back", sets: 4, reps: "8–10" },
-    { name: "Seated shoulder press", muscle: "Shoulders", sets: 3, reps: "8–10" },
-    { name: "Cable curl", muscle: "Biceps", sets: 2, reps: "10–12" },
-    { name: "Rope pressdown", muscle: "Triceps", sets: 2, reps: "10–12" },
-  ],
-  lower: [
-    { name: "Back squat", muscle: "Quads", sets: 4, reps: "5–8" },
-    { name: "Romanian deadlift", muscle: "Hamstrings", sets: 3, reps: "8–10" },
-    { name: "Leg press", muscle: "Quads", sets: 3, reps: "10–12" },
-    { name: "Hip thrust", muscle: "Glutes", sets: 3, reps: "8–12" },
-    { name: "Standing calf raise", muscle: "Calves", sets: 3, reps: "10–15" },
-  ],
-  push: [
-    { name: "Incline press", muscle: "Chest", sets: 4, reps: "6–10" },
-    { name: "Machine press", muscle: "Chest", sets: 3, reps: "8–12" },
-    { name: "Lateral raise", muscle: "Shoulders", sets: 4, reps: "12–15" },
-    { name: "Overhead extension", muscle: "Triceps", sets: 3, reps: "10–12" },
-  ],
-  pull: [
-    { name: "Lat pulldown", muscle: "Back", sets: 4, reps: "8–12" },
-    { name: "Cable row", muscle: "Back", sets: 3, reps: "8–12" },
-    { name: "Rear-delt fly", muscle: "Shoulders", sets: 3, reps: "12–15" },
-    { name: "Incline curl", muscle: "Biceps", sets: 3, reps: "10–12" },
-  ],
-  full: [
-    { name: "Goblet squat", muscle: "Quads", sets: 3, reps: "8–12" },
-    { name: "Dumbbell press", muscle: "Chest", sets: 3, reps: "8–12" },
-    { name: "Romanian deadlift", muscle: "Hamstrings", sets: 3, reps: "8–12" },
-    { name: "One-arm row", muscle: "Back", sets: 3, reps: "8–12" },
-    { name: "Loaded carry", muscle: "Core", sets: 3, reps: "30 sec" },
-  ],
-};
-
-function createSession(
-  id: string,
-  title: string,
-  focus: string,
-  duration: number,
-  exercises: Session["exercises"],
-): Session {
-  return { id, title, focus, duration, exercises };
-}
-
-function buildWeek(days: number, duration: number): Array<Session | null> {
-  if (days <= 3) {
-    return [
-      createSession("mon", "Full body A", "Balanced", duration, EXERCISES.full),
-      null,
-      createSession("wed", "Full body B", "Strength", duration, EXERCISES.full),
-      null,
-      createSession("fri", "Full body C", "Volume", duration, EXERCISES.full),
-      null,
-      null,
-    ];
-  }
-
-  if (days === 4) {
-    return [
-      createSession("mon", "Upper strength", "Chest · Back", duration, EXERCISES.upper),
-      createSession("tue", "Lower strength", "Quads · Glutes", duration, EXERCISES.lower),
-      null,
-      createSession("thu", "Upper volume", "Back · Delts", duration, EXERCISES.upper),
-      createSession("fri", "Lower volume", "Hams · Quads", duration, EXERCISES.lower),
-      null,
-      null,
-    ];
-  }
-
-  if (days === 5) {
-    return [
-      createSession("mon", "Push", "Chest · Delts", duration, EXERCISES.push),
-      createSession("tue", "Pull", "Back · Biceps", duration, EXERCISES.pull),
-      createSession("wed", "Lower", "Quads · Glutes", duration, EXERCISES.lower),
-      null,
-      createSession("fri", "Upper", "Balanced", duration, EXERCISES.upper),
-      createSession("sat", "Lower", "Posterior chain", duration, EXERCISES.lower),
-      null,
-    ];
-  }
-
-  return [
-    createSession("mon", "Push A", "Chest · Delts", duration, EXERCISES.push),
-    createSession("tue", "Pull A", "Back · Biceps", duration, EXERCISES.pull),
-    createSession("wed", "Lower A", "Quads · Glutes", duration, EXERCISES.lower),
-    createSession("thu", "Push B", "Chest · Triceps", duration, EXERCISES.push),
-    createSession("fri", "Pull B", "Back · Rear delts", duration, EXERCISES.pull),
-    createSession("sat", "Lower B", "Hams · Glutes", duration, EXERCISES.lower),
-    null,
-  ];
-}
 
 const DAY_LABELS = ["MON", "TUE", "WED", "THU", "FRI", "SAT", "SUN"];
 
 export function PlanScreen({
-  scenario,
-  onScenarioChange,
+  program,
+  sessions,
+  onSessionsChange,
+  onProgramChange,
   onOpenLog,
 }: PlanScreenProps) {
+  const [selectedDay, setSelectedDay] = useState(0);
   const week = useMemo(
-    () => buildWeek(scenario.daysPerWeek, scenario.sessionMinutes),
-    [scenario.daysPerWeek, scenario.sessionMinutes],
+    () =>
+      DAY_LABELS.map((_, dayIndex) =>
+        sessions.find((session) => session.dayIndex === dayIndex),
+      ),
+    [sessions],
   );
-  const firstSessionIndex = Math.max(
+  const selectedSession = week[selectedDay];
+  const totalMinutes = sessions.reduce(
+    (total, session) => total + session.duration,
     0,
-    week.findIndex((session) => session !== null),
   );
-  const [selectedDay, setSelectedDay] = useState(firstSessionIndex);
-  const displayedDay = week[selectedDay] ? selectedDay : firstSessionIndex;
-  const selectedSession = week[displayedDay] ?? week[firstSessionIndex];
   const highPriorityMuscles = MUSCLE_GROUPS.filter(
-    (muscle) => scenario.muscles[muscle.id].priority === 3,
+    (muscle) => program.muscles[muscle.id].priority === 3,
   );
+
+  const updateSession = (
+    sessionId: string,
+    update: (session: PlanSession) => PlanSession,
+  ) => {
+    onSessionsChange((current) =>
+      current.map((session) =>
+        session.id === sessionId ? update(session) : session,
+      ),
+    );
+  };
+
+  const addSession = () => {
+    if (selectedSession) return;
+    onSessionsChange((current) => [
+      ...current,
+      {
+        id: createId("session"),
+        dayIndex: selectedDay,
+        title: "",
+        focus: "",
+        duration: program.sessionMinutes,
+        exercises: [],
+      },
+    ]);
+  };
+
+  const removeSession = (sessionId: string) => {
+    onSessionsChange((current) =>
+      current.filter((session) => session.id !== sessionId),
+    );
+  };
+
+  const addExercise = (sessionId: string) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      exercises: [
+        ...session.exercises,
+        {
+          id: createId("exercise"),
+          name: "",
+          muscle: "",
+          sets: 1,
+          reps: "",
+        },
+      ],
+    }));
+  };
+
+  const updateExercise = (
+    sessionId: string,
+    exerciseId: string,
+    update: Partial<PlanExercise>,
+  ) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      exercises: session.exercises.map((exercise) =>
+        exercise.id === exerciseId
+          ? { ...exercise, ...update }
+          : exercise,
+      ),
+    }));
+  };
+
+  const removeExercise = (sessionId: string, exerciseId: string) => {
+    updateSession(sessionId, (session) => ({
+      ...session,
+      exercises: session.exercises.filter(
+        (exercise) => exercise.id !== exerciseId,
+      ),
+    }));
+  };
 
   return (
     <div className="plan-screen screen-enter">
       <header className="screen-heading">
         <div>
-          <span className="eyebrow">Adaptive training structure</span>
+          <span className="eyebrow">Your training structure</span>
           <h1>Plan</h1>
           <p>
-            Turn the Lab scenario into a practical weekly rhythm that fits
-            your schedule and equipment.
+            Build a weekly schedule from your own sessions and exercises.
           </p>
         </div>
-        <button type="button" className="primary-button" onClick={onOpenLog}>
-          Start next session
+        <button
+          type="button"
+          className="primary-button"
+          onClick={onOpenLog}
+          disabled={sessions.length === 0}
+        >
+          Open workout log
           <ChevronRight size={16} />
         </button>
       </header>
 
       <section className="plan-settings panel-card">
         <div className="plan-settings__title">
-          <span className="stat-icon stat-icon--violet">
+          <span className="plan-section-icon">
             <Settings2 size={17} />
           </span>
           <div>
@@ -187,9 +174,9 @@ export function PlanScreen({
               <button
                 key={days}
                 type="button"
-                className={scenario.daysPerWeek === days ? "is-active" : ""}
+                className={program.daysPerWeek === days ? "is-active" : ""}
                 onClick={() =>
-                  onScenarioChange((current) => ({
+                  onProgramChange((current) => ({
                     ...current,
                     daysPerWeek: days,
                   }))
@@ -202,15 +189,17 @@ export function PlanScreen({
         </label>
 
         <label className="setting-control">
-          <span>Session length</span>
+          <span>Default session length</span>
           <div className="segmented-control">
             {[45, 60, 75, 90].map((minutes) => (
               <button
                 key={minutes}
                 type="button"
-                className={scenario.sessionMinutes === minutes ? "is-active" : ""}
+                className={
+                  program.sessionMinutes === minutes ? "is-active" : ""
+                }
                 onClick={() =>
-                  onScenarioChange((current) => ({
+                  onProgramChange((current) => ({
                     ...current,
                     sessionMinutes: minutes,
                   }))
@@ -225,11 +214,11 @@ export function PlanScreen({
         <label className="setting-select">
           <span>Equipment</span>
           <select
-            value={scenario.equipment}
+            value={program.equipment}
             onChange={(event) =>
-              onScenarioChange((current) => ({
+              onProgramChange((current) => ({
                 ...current,
-                equipment: event.target.value as Scenario["equipment"],
+                equipment: event.target.value as TrainingProgram["equipment"],
               }))
             }
           >
@@ -245,13 +234,12 @@ export function PlanScreen({
       <section className="weekly-calendar panel-card">
         <header className="panel-card__header">
           <div>
-            <span className="eyebrow">Week 4</span>
+            <span className="eyebrow">Weekly schedule</span>
             <h2>Your training week</h2>
           </div>
           <span className="calendar-summary">
             <CalendarDays size={15} />
-            {scenario.daysPerWeek} sessions ·{" "}
-            {scenario.daysPerWeek * scenario.sessionMinutes} min
+            {sessions.length} sessions · {totalMinutes} min
           </span>
         </header>
 
@@ -261,26 +249,27 @@ export function PlanScreen({
               key={DAY_LABELS[index]}
               type="button"
               className={`${session ? "has-session" : "rest-day"} ${
-                displayedDay === index && session ? "is-selected" : ""
+                selectedDay === index ? "is-selected" : ""
               }`}
-              onClick={() => session && setSelectedDay(index)}
-              disabled={!session}
+              onClick={() => setSelectedDay(index)}
             >
               <span>{DAY_LABELS[index]}</span>
               {session ? (
                 <>
-                  <i>
+                  <span className="calendar-icon" aria-hidden="true">
                     <Dumbbell size={15} />
-                  </i>
-                  <strong>{session.title}</strong>
-                  <small>{session.focus}</small>
+                  </span>
+                  <strong>{session.title || "Untitled session"}</strong>
+                  <small>{session.focus || "No focus added"}</small>
                   <b>{session.duration} min</b>
                 </>
               ) : (
                 <>
-                  <i className="rest-icon" />
-                  <strong>Recovery</strong>
-                  <small>Walk · Mobility</small>
+                  <span className="calendar-icon" aria-hidden="true">
+                    <CircleOff size={16} />
+                  </span>
+                  <strong>No session</strong>
+                  <small>Select to add one</small>
                 </>
               )}
             </button>
@@ -290,46 +279,196 @@ export function PlanScreen({
 
       <section className="plan-detail-grid">
         <article className="panel-card session-detail">
-          <header className="panel-card__header">
-            <div>
-              <span className="eyebrow">
-                {DAY_LABELS[displayedDay] ?? "MON"} ·{" "}
-                {selectedSession?.duration ?? scenario.sessionMinutes} minutes
-              </span>
-              <h2>{selectedSession?.title ?? "Next session"}</h2>
-            </div>
-            <button type="button" className="secondary-button">
-              <Plus size={15} />
-              Add exercise
-            </button>
-          </header>
+          {selectedSession ? (
+            <>
+              <header className="panel-card__header session-editor-header">
+                <div className="session-editor-fields">
+                  <span className="eyebrow">{DAY_LABELS[selectedDay]}</span>
+                  <input
+                    type="text"
+                    value={selectedSession.title}
+                    maxLength={48}
+                    placeholder="Session name"
+                    aria-label="Session name"
+                    onChange={(event) =>
+                      updateSession(selectedSession.id, (session) => ({
+                        ...session,
+                        title: event.target.value,
+                      }))
+                    }
+                  />
+                  <input
+                    type="text"
+                    value={selectedSession.focus}
+                    maxLength={64}
+                    placeholder="Focus or notes"
+                    aria-label="Session focus"
+                    onChange={(event) =>
+                      updateSession(selectedSession.id, (session) => ({
+                        ...session,
+                        focus: event.target.value,
+                      }))
+                    }
+                  />
+                </div>
+                <div className="session-editor-actions">
+                  <label>
+                    <span className="sr-only">Session duration in minutes</span>
+                    <input
+                      type="number"
+                      min="1"
+                      value={selectedSession.duration}
+                      onChange={(event) =>
+                        updateSession(selectedSession.id, (session) => ({
+                          ...session,
+                          duration: Math.max(1, Number(event.target.value)),
+                        }))
+                      }
+                    />
+                    <span>min</span>
+                  </label>
+                  <button
+                    type="button"
+                    className="secondary-button"
+                    onClick={() => addExercise(selectedSession.id)}
+                  >
+                    <Plus size={15} />
+                    Add exercise
+                  </button>
+                  <button
+                    type="button"
+                    className="icon-button"
+                    aria-label="Delete session"
+                    onClick={() => removeSession(selectedSession.id)}
+                  >
+                    <Trash2 size={15} />
+                  </button>
+                </div>
+              </header>
 
-          <div className="exercise-plan-list">
-            {selectedSession?.exercises.map((exercise, index) => (
-              <div key={`${exercise.name}-${index}`}>
-                <span className="exercise-order">{index + 1}</span>
-                <p>
-                  <strong>{exercise.name}</strong>
-                  <small>{exercise.muscle}</small>
-                </p>
-                <span>
-                  <b>{exercise.sets}</b>
-                  <small>sets</small>
-                </span>
-                <span>
-                  <b>{exercise.reps}</b>
-                  <small>reps</small>
-                </span>
-                <span>
-                  <b>{scenario.values.rir}</b>
-                  <small>RIR</small>
-                </span>
-                <button type="button" aria-label={`Edit ${exercise.name}`}>
-                  <ChevronRight size={15} />
-                </button>
+              <div className="exercise-plan-list">
+                {selectedSession.exercises.length === 0 ? (
+                  <div className="data-empty-state">
+                    <p>No exercises have been added to this session.</p>
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => addExercise(selectedSession.id)}
+                    >
+                      <Plus size={15} />
+                      Add your first exercise
+                    </button>
+                  </div>
+                ) : (
+                  selectedSession.exercises.map((exercise, index) => (
+                    <div
+                      key={exercise.id}
+                      className="exercise-plan-editor-row"
+                    >
+                      <span className="exercise-order">{index + 1}</span>
+                      <p>
+                        <input
+                          type="text"
+                          value={exercise.name}
+                          placeholder="Exercise name"
+                          aria-label={`Exercise ${index + 1} name`}
+                          onChange={(event) =>
+                            updateExercise(
+                              selectedSession.id,
+                              exercise.id,
+                              { name: event.target.value },
+                            )
+                          }
+                        />
+                        <select
+                          value={exercise.muscle}
+                          aria-label={`Exercise ${index + 1} muscle`}
+                          onChange={(event) =>
+                            updateExercise(
+                              selectedSession.id,
+                              exercise.id,
+                              { muscle: event.target.value },
+                            )
+                          }
+                        >
+                          <option value="">Select muscle</option>
+                          {MUSCLE_GROUPS.map((muscle) => (
+                            <option key={muscle.id} value={muscle.label}>
+                              {muscle.label}
+                            </option>
+                          ))}
+                        </select>
+                      </p>
+                      <label>
+                        <input
+                          type="number"
+                          min="1"
+                          value={exercise.sets}
+                          aria-label={`Sets for ${exercise.name || `exercise ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateExercise(
+                              selectedSession.id,
+                              exercise.id,
+                              {
+                                sets: Math.max(
+                                  1,
+                                  Number(event.target.value),
+                                ),
+                              },
+                            )
+                          }
+                        />
+                        <small>sets</small>
+                      </label>
+                      <label>
+                        <input
+                          type="text"
+                          value={exercise.reps}
+                          placeholder="e.g. 8–10"
+                          aria-label={`Reps for ${exercise.name || `exercise ${index + 1}`}`}
+                          onChange={(event) =>
+                            updateExercise(
+                              selectedSession.id,
+                              exercise.id,
+                              { reps: event.target.value },
+                            )
+                          }
+                        />
+                        <small>reps</small>
+                      </label>
+                      <span>
+                        <b>{program.values.rir}</b>
+                        <small>RIR</small>
+                      </span>
+                      <button
+                        type="button"
+                        aria-label={`Delete ${exercise.name || `exercise ${index + 1}`}`}
+                        onClick={() =>
+                          removeExercise(selectedSession.id, exercise.id)
+                        }
+                      >
+                        <Trash2 size={14} />
+                      </button>
+                    </div>
+                  ))
+                )}
               </div>
-            ))}
-          </div>
+            </>
+          ) : (
+            <div className="data-empty-state data-empty-state--large">
+              <CalendarDays size={24} />
+              <h2>No session planned for {DAY_LABELS[selectedDay]}</h2>
+              <p>Create a blank session, then add only the exercises you want.</p>
+              <button
+                type="button"
+                className="primary-button"
+                onClick={addSession}
+              >
+                <Plus size={15} />
+                Create session
+              </button>
+            </div>
+          )}
         </article>
 
         <aside className="plan-insights">
@@ -340,17 +479,21 @@ export function PlanScreen({
             </span>
             <h3>Volume follows your Lab choices</h3>
             <p>
-              The plan currently gives extra attention to your selected focus
-              muscles while keeping the rest of the body active.
+              Focus muscles appear here after you choose them in the Physique
+              Lab.
             </p>
             <div className="priority-chip-list">
-              {highPriorityMuscles.map((muscle) => (
-                <span key={muscle.id}>
-                  <i style={{ background: muscle.color }} />
-                  {muscle.label}
-                  <b>{scenario.muscles[muscle.id].sets}</b>
-                </span>
-              ))}
+              {highPriorityMuscles.length === 0 ? (
+                <span>No focus muscles selected</span>
+              ) : (
+                highPriorityMuscles.map((muscle) => (
+                  <span key={muscle.id}>
+                    <Target size={14} aria-hidden="true" />
+                    {muscle.label}
+                    <b>{program.muscles[muscle.id].sets}</b>
+                  </span>
+                ))
+              )}
             </div>
           </article>
 
@@ -361,21 +504,21 @@ export function PlanScreen({
             </span>
             <div>
               <span>
-                <b>{scenario.daysPerWeek}</b>
+                <b>{sessions.length}</b>
                 sessions
               </span>
               <span>
-                <b>{scenario.daysPerWeek * scenario.sessionMinutes}</b>
+                <b>{totalMinutes}</b>
                 minutes
               </span>
               <span>
-                <b>{scenario.values.adherence}%</b>
+                <b>{program.values.adherence}%</b>
                 target adherence
               </span>
             </div>
             <p>
               <Check size={14} />
-              Fits the current recovery inputs
+              Calculated from your saved plan
             </p>
           </article>
         </aside>

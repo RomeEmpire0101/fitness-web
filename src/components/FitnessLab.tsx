@@ -3,24 +3,25 @@
 import {
   Bell,
   CalendarRange,
+  Dumbbell,
   FlaskConical,
   Home,
   Menu,
   NotebookPen,
   Search,
   Settings,
-  Sparkles,
   X,
 } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useCharacterProfile } from "@/features/characters";
+import { useFitnessData } from "@/hooks/useFitnessData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
 import {
-  cloneScenario,
+  createDefaultTrainingProgram,
   derivePhysique,
-  INITIAL_SCENARIOS,
-  PhysiqueResult,
-  Scenario,
+  EXPERIENCE_LEVELS,
+  GOALS,
+  TrainingProgram,
 } from "@/lib/simulation";
 import { TodayDashboard } from "./dashboard/TodayDashboard";
 import { LabScreen } from "./lab/LabScreen";
@@ -40,38 +41,22 @@ const NAVIGATION: Array<{
   { id: "log", label: "Workout Log", Icon: NotebookPen },
 ];
 
-const createInitialScenarios = () =>
-  INITIAL_SCENARIOS.map((scenario) => cloneScenario(scenario));
-
 export function FitnessLab() {
   const [view, setView] = useState<AppView>("today");
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const [scenarios, setScenarios] =
-    useState<Scenario[]>(createInitialScenarios);
-  const [activeScenarioId, setActiveScenarioId] =
-    useState<Scenario["id"]>("scenario-a");
+  const [fitnessData, setFitnessData] = useFitnessData();
+  const { program, planSessions, workouts } = fitnessData;
   const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
   const reducedMotion = useReducedMotion();
   const {
     profile,
+    updateName,
     updateMeasurement,
     updateBodyColor,
     resetProfile,
   } = useCharacterProfile();
 
-  const results = useMemo(
-    () =>
-      scenarios.reduce((resultMap, scenario) => {
-        resultMap[scenario.id] = derivePhysique(scenario);
-        return resultMap;
-      }, {} as Record<Scenario["id"], PhysiqueResult>),
-    [scenarios],
-  );
-
-  const activeScenario =
-    scenarios.find((scenario) => scenario.id === activeScenarioId) ??
-    scenarios[0];
-  const activeResult = results[activeScenario.id];
+  const result = useMemo(() => derivePhysique(program), [program]);
 
   const navigate = (nextView: AppView) => {
     setView(nextView);
@@ -81,21 +66,26 @@ export function FitnessLab() {
     });
   };
 
-  const updateScenario = (
-    id: Scenario["id"],
-    update: (scenario: Scenario) => Scenario,
+  const updateProgram = (
+    update: (program: TrainingProgram) => TrainingProgram,
   ) => {
-    setScenarios((current) =>
-      current.map((scenario) =>
-        scenario.id === id ? update(scenario) : scenario,
-      ),
-    );
+    setFitnessData((current) => ({
+      ...current,
+      program: update(current.program),
+    }));
   };
 
-  const resetScenarios = () => {
-    setScenarios(createInitialScenarios());
-    setActiveScenarioId("scenario-a");
+  const resetProgram = () => {
+    setFitnessData((current) => ({
+      ...current,
+      program: createDefaultTrainingProgram(),
+    }));
   };
+
+  const activeGoal = GOALS.find((goal) => goal.id === program.goal);
+  const activeExperience = EXPERIENCE_LEVELS.find(
+    (level) => level.id === program.experience,
+  );
 
   return (
     <div className="fitness-app">
@@ -105,10 +95,8 @@ export function FitnessLab() {
         }`}
       >
         <header className="app-brand">
-          <span aria-hidden="true">
-            <i />
-            <i />
-            <i />
+          <span className="app-brand__icon" aria-hidden="true">
+            <Dumbbell size={20} strokeWidth={1.9} />
           </span>
           <div>
             <strong>FORMFORGE</strong>
@@ -136,20 +124,9 @@ export function FitnessLab() {
             >
               <Icon size={18} strokeWidth={1.9} />
               <span>{label}</span>
-              {id === "log" && <i>Live</i>}
             </button>
           ))}
         </nav>
-
-        <div className="sidebar-lab-note">
-          <span>
-            <Sparkles size={14} />
-          </span>
-          <p>
-            <strong>Scenario mode</strong>
-            <small>Explore relationships, not exact predictions.</small>
-          </p>
-        </div>
 
         <footer className="sidebar-footer">
           <button type="button">
@@ -157,10 +134,14 @@ export function FitnessLab() {
             <span>Settings</span>
           </button>
           <div className="sidebar-profile">
-            <span>{profile.name.slice(0, 2).toUpperCase()}</span>
+            <span>
+              {profile.name.trim().slice(0, 2).toUpperCase() || "—"}
+            </span>
             <p>
-              <strong>{profile.name}</strong>
-              <small>Intermediate · Build</small>
+              <strong>{profile.name.trim() || "Unnamed profile"}</strong>
+              <small>
+                {activeExperience?.label} · {activeGoal?.label}
+              </small>
             </p>
           </div>
         </footer>
@@ -198,21 +179,18 @@ export function FitnessLab() {
           <div className="topbar-actions">
             <button type="button" aria-label="Notifications">
               <Bell size={17} />
-              <i />
             </button>
-            <span className="topbar-scenario">
-              <i />
-              {activeScenario.name}
-            </span>
           </div>
         </header>
 
         <main className="app-content">
           {view === "today" && (
             <TodayDashboard
-              scenario={activeScenario}
-              result={activeResult}
+              program={program}
+              result={result}
               profile={profile}
+              planSessions={planSessions}
+              workouts={workouts}
               reducedMotion={reducedMotion}
               onNavigate={navigate}
             />
@@ -220,16 +198,15 @@ export function FitnessLab() {
 
           {view === "lab" && (
             <LabScreen
-              scenarios={scenarios}
-              results={results}
-              activeScenarioId={activeScenarioId}
+              program={program}
+              result={result}
               profile={profile}
               reducedMotion={reducedMotion}
-              onActiveScenarioChange={setActiveScenarioId}
-              onScenarioChange={updateScenario}
-              onResetScenarios={resetScenarios}
+              onProgramChange={updateProgram}
+              onResetProgram={resetProgram}
               characterEditorOpen={characterEditorOpen}
               onCharacterEditorOpenChange={setCharacterEditorOpen}
+              onNameChange={updateName}
               onMeasurementChange={updateMeasurement}
               onBodyColorChange={updateBodyColor}
               onResetCharacter={resetProfile}
@@ -238,15 +215,33 @@ export function FitnessLab() {
 
           {view === "plan" && (
             <PlanScreen
-              scenario={activeScenario}
-              onScenarioChange={(update) =>
-                updateScenario(activeScenario.id, update)
+              program={program}
+              sessions={planSessions}
+              onSessionsChange={(update) =>
+                setFitnessData((current) => ({
+                  ...current,
+                  planSessions: update(current.planSessions),
+                }))
               }
+              onProgramChange={updateProgram}
               onOpenLog={() => navigate("log")}
             />
           )}
 
-          {view === "log" && <LogScreen scenario={activeScenario} />}
+          {view === "log" && (
+            <LogScreen
+              program={program}
+              sessions={planSessions}
+              workouts={workouts}
+              onWorkoutsChange={(update) =>
+                setFitnessData((current) => ({
+                  ...current,
+                  workouts: update(current.workouts),
+                }))
+              }
+              onOpenPlan={() => navigate("plan")}
+            />
+          )}
         </main>
       </div>
     </div>

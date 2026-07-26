@@ -44,8 +44,11 @@ export function deriveCharacterMorphology(
   return {
     heightScale,
     widthScale,
-    groundOffset: (heightScale - 1) * 2.26,
-    cameraDistance: 10.3 + Math.max(0, heightScale - 1) * 2.2,
+    groundOffset: (heightScale - 1) * 2.49,
+    cameraDistance:
+      10.35 +
+      Math.max(0, heightScale - 1) * 2.2 +
+      Math.max(0, widthScale - 1) * 0.8,
     buildLabel,
   };
 }

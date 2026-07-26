@@ -12,52 +12,124 @@ import {
   Target,
   TrendingUp,
 } from "lucide-react";
+import { useMemo, useSyncExternalStore } from "react";
 import { CharacterProfile } from "@/features/characters";
 import CharacterScene from "@/features/characters/scene/CharacterScene";
+import {
+  getDayIndex,
+  getNextPlanSession,
+  PlanSession,
+  WorkoutSession,
+} from "@/lib/fitnessData";
 import {
   getMuscleDefinition,
   MUSCLE_GROUPS,
   PhysiqueResult,
-  Scenario,
+  TrainingProgram,
 } from "@/lib/simulation";
 
 type TodayDashboardProps = {
-  scenario: Scenario;
+  program: TrainingProgram;
   result: PhysiqueResult;
   profile: CharacterProfile;
+  planSessions: PlanSession[];
+  workouts: WorkoutSession[];
   reducedMotion: boolean;
   onNavigate: (view: "lab" | "plan" | "log") => void;
 };
 
+const DAY_LABELS = ["M", "T", "W", "T", "F", "S", "S"];
+const DAY_NAMES = [
+  "Monday",
+  "Tuesday",
+  "Wednesday",
+  "Thursday",
+  "Friday",
+  "Saturday",
+  "Sunday",
+];
+const subscribeToHydration = () => () => {};
+
 export function TodayDashboard({
-  scenario,
+  program,
   result,
   profile,
+  planSessions,
+  workouts,
   reducedMotion,
   onNavigate,
 }: TodayDashboardProps) {
-  const focusMuscles = MUSCLE_GROUPS.filter(
-    (muscle) => scenario.muscles[muscle.id].priority === 3,
-  ).slice(0, 3);
-  const completedSessions = Math.max(1, scenario.daysPerWeek - 1);
-  const weeklyProgress = Math.round(
-    (completedSessions / scenario.daysPerWeek) * 100,
+  const hydrated = useSyncExternalStore(
+    subscribeToHydration,
+    () => true,
+    () => false,
   );
+  const today = hydrated ? new Date() : null;
+
+  const focusMuscles = MUSCLE_GROUPS.filter(
+    (muscle) => program.muscles[muscle.id].priority === 3,
+  ).slice(0, 3);
+  const nextSession = today
+    ? getNextPlanSession(planSessions, today)
+    : planSessions[0];
+  const todayIndex = today ? getDayIndex(today) : -1;
+  const weekStart = useMemo(() => {
+    if (!today) return null;
+    const start = new Date(today);
+    start.setHours(0, 0, 0, 0);
+    start.setDate(start.getDate() - getDayIndex(start));
+    return start;
+  }, [today]);
+  const completedThisWeek = workouts.filter((workout) => {
+    if (!workout.completedAt || !weekStart) return false;
+    const completedAt = new Date(workout.completedAt);
+    const weekEnd = new Date(weekStart);
+    weekEnd.setDate(weekEnd.getDate() + 7);
+    return completedAt >= weekStart && completedAt < weekEnd;
+  });
+  const weeklyProgress =
+    planSessions.length === 0
+      ? 0
+      : Math.round(
+          (Math.min(completedThisWeek.length, planSessions.length) /
+            planSessions.length) *
+            100,
+        );
+  const greeting =
+    !today
+      ? "Welcome"
+      : today.getHours() < 12
+        ? "Good morning"
+        : today.getHours() < 18
+          ? "Good afternoon"
+          : "Good evening";
+  const dateLabel = today
+    ? new Intl.DateTimeFormat(undefined, {
+        weekday: "long",
+        month: "long",
+        day: "numeric",
+      }).format(today)
+    : "Today";
 
   return (
     <div className="dashboard-screen screen-enter">
       <header className="screen-heading dashboard-heading">
         <div>
-          <span className="eyebrow">Monday · Week 4 of {scenario.values.weeks}</span>
-          <h1>Good morning, Athlete.</h1>
-          <p>Your plan is balanced. Keep today’s work deliberate.</p>
+          <span className="eyebrow">{dateLabel}</span>
+          <h1>
+            {greeting}
+            {profile.name.trim() ? `, ${profile.name.trim()}` : ""}.
+          </h1>
+          <p>
+            Your dashboard reflects only the plan and workouts you have saved.
+          </p>
         </div>
         <button
           type="button"
           className="primary-button"
           onClick={() => onNavigate("log")}
         >
-          Start workout
+          Open workout log
           <ArrowRight size={16} />
         </button>
       </header>
@@ -66,7 +138,7 @@ export function TodayDashboard({
         <article className="hero-copy-card">
           <span className="card-kicker">
             <Sparkles size={14} />
-            Today’s signal
+            Training signal
           </span>
           <strong className="hero-score">{result.readiness}</strong>
           <span className="hero-score-label">Readiness</span>
@@ -79,7 +151,7 @@ export function TodayDashboard({
 
         <article className="dashboard-character-card">
           <div className="dashboard-character-copy">
-            <span>{profile.name}</span>
+            <span>{profile.name.trim() || "Your profile"}</span>
             <b>{result.stage}</b>
           </div>
           <div className="dashboard-character">
@@ -105,7 +177,7 @@ export function TodayDashboard({
             </span>
             <i />
             <span>
-              <b>{scenario.values.bodyFat}</b>% est.
+              <b>{program.values.bodyFat}</b>% est.
             </span>
           </div>
         </article>
@@ -116,17 +188,39 @@ export function TodayDashboard({
               <CalendarDays size={14} />
               Next session
             </span>
-            <span>6:30 PM</span>
+            {nextSession && (
+              <span>{DAY_NAMES[nextSession.dayIndex]}</span>
+            )}
           </header>
-          <h2>Upper strength</h2>
-          <p>Chest, back and shoulders · {scenario.sessionMinutes} min</p>
-          <div className="workout-exercise-stack" aria-hidden="true">
-            <span>Bench press</span>
-            <span>Chest-supported row</span>
-            <span>Seated shoulder press</span>
-          </div>
+          {nextSession ? (
+            <>
+              <h2>{nextSession.title || "Untitled session"}</h2>
+              <p>
+                {nextSession.focus || "No focus added"} ·{" "}
+                {nextSession.duration} min
+              </p>
+              <div className="workout-exercise-stack">
+                {nextSession.exercises.length > 0 ? (
+                  nextSession.exercises
+                    .slice(0, 3)
+                    .map((exercise) => (
+                      <span key={exercise.id}>
+                        {exercise.name || "Unnamed exercise"}
+                      </span>
+                    ))
+                ) : (
+                  <span>No exercises added</span>
+                )}
+              </div>
+            </>
+          ) : (
+            <>
+              <h2>No session planned</h2>
+              <p>Create your first session to populate this card.</p>
+            </>
+          )}
           <button type="button" onClick={() => onNavigate("plan")}>
-            View plan
+            {nextSession ? "View plan" : "Create plan"}
             <ChevronRight size={15} />
           </button>
         </article>
@@ -140,7 +234,7 @@ export function TodayDashboard({
           <div>
             <small>Weekly consistency</small>
             <strong>
-              {completedSessions}/{scenario.daysPerWeek} sessions
+              {completedThisWeek.length}/{planSessions.length} sessions
             </strong>
           </div>
           <b>{weeklyProgress}%</b>
@@ -169,7 +263,7 @@ export function TodayDashboard({
           </span>
           <div>
             <small>Average sleep</small>
-            <strong>{scenario.values.sleepHours} hours</strong>
+            <strong>{program.values.sleepHours} hours</strong>
           </div>
           <b>{result.readiness}</b>
           <span className="mini-progress">
@@ -184,13 +278,13 @@ export function TodayDashboard({
           <div>
             <small>Energy target</small>
             <strong>
-              {scenario.values.calorieBalance > 0 ? "+" : ""}
-              {scenario.values.calorieBalance} kcal
+              {program.values.calorieBalance > 0 ? "+" : ""}
+              {program.values.calorieBalance} kcal
             </strong>
           </div>
-          <b>{scenario.values.adherence}%</b>
+          <b>{program.values.adherence}%</b>
           <span className="mini-progress">
-            <i style={{ width: `${scenario.values.adherence}%` }} />
+            <i style={{ width: `${program.values.adherence}%` }} />
           </span>
         </article>
       </section>
@@ -208,26 +302,33 @@ export function TodayDashboard({
             </button>
           </header>
           <div className="week-strip">
-            {[
-              ["M", "Upper", true],
-              ["T", "Lower", true],
-              ["W", "Recover", false],
-              ["T", "Upper", true],
-              ["F", "Lower", false],
-              ["S", "Move", false],
-              ["S", "Rest", false],
-            ].map(([day, label, trained], index) => (
-              <div
-                key={`${day}-${index}`}
-                className={`${trained ? "is-complete" : ""} ${
-                  index === 3 ? "is-today" : ""
-                }`}
-              >
-                <span>{day}</span>
-                <i>{trained ? <Check size={12} /> : null}</i>
-                <small>{label}</small>
-              </div>
-            ))}
+            {DAY_LABELS.map((day, index) => {
+              const session = planSessions.find(
+                (item) => item.dayIndex === index,
+              );
+              const completed = Boolean(
+                session &&
+                  completedThisWeek.some(
+                    (workout) => workout.planSessionId === session.id,
+                  ),
+              );
+              return (
+                <div
+                  key={`${day}-${index}`}
+                  className={`${completed ? "is-complete" : ""} ${
+                    index === todayIndex ? "is-today" : ""
+                  }`}
+                >
+                  <span>{day}</span>
+                  <i>{completed ? <Check size={12} /> : null}</i>
+                  <small>
+                    {session
+                      ? session.title || "Untitled"
+                      : "No session"}
+                  </small>
+                </div>
+              );
+            })}
           </div>
         </article>
 
@@ -240,22 +341,30 @@ export function TodayDashboard({
             <Dumbbell size={18} />
           </header>
           <div className="focus-muscle-list">
-            {focusMuscles.map((muscle) => {
-              const setting = scenario.muscles[muscle.id];
-              const definition = getMuscleDefinition(muscle.id);
-              return (
-                <div key={muscle.id}>
-                  <span
-                    style={{ "--focus-color": definition?.color } as React.CSSProperties}
-                  />
-                  <p>
-                    <strong>{definition?.label}</strong>
-                    <small>{setting.sets} working sets / week</small>
-                  </p>
-                  <b>Focus</b>
-                </div>
-              );
-            })}
+            {focusMuscles.length === 0 ? (
+              <p>No focus muscles selected in the Lab.</p>
+            ) : (
+              focusMuscles.map((muscle) => {
+                const setting = program.muscles[muscle.id];
+                const definition = getMuscleDefinition(muscle.id);
+                return (
+                  <div key={muscle.id}>
+                    <span
+                      style={
+                        {
+                          "--focus-color": definition?.color,
+                        } as React.CSSProperties
+                      }
+                    />
+                    <p>
+                      <strong>{definition?.label}</strong>
+                      <small>{setting.sets} working sets / week</small>
+                    </p>
+                    <b>Focus</b>
+                  </div>
+                );
+              })
+            )}
           </div>
           <button type="button" onClick={() => onNavigate("lab")}>
             Adjust priorities
@@ -264,7 +373,7 @@ export function TodayDashboard({
       </section>
 
       <p className="simulation-note">
-        FormForge visualizes an illustrative scenario. It does not predict an
+        FormForge visualizes how training inputs relate. It does not predict an
         exact future body or provide medical guidance.
       </p>
     </div>

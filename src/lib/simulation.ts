@@ -49,8 +49,8 @@ export type MuscleSetting = {
 
 export type MuscleSettings = Record<MuscleGroupId, MuscleSetting>;
 
-export type Scenario = {
-  id: "scenario-a" | "scenario-b";
+export type TrainingProgram = {
+  id: "training-program";
   name: string;
   goal: GoalId;
   experience: ExperienceId;
@@ -176,7 +176,7 @@ export const METRICS: MetricDefinition[] = [
   },
   {
     id: "weeks",
-    label: "Scenario timeline",
+    label: "Training timeline",
     shortLabel: "Timeline",
     unit: "weeks",
     shortUnit: "weeks",
@@ -185,7 +185,7 @@ export const METRICS: MetricDefinition[] = [
     step: 1,
     initial: 12,
     accent: "#4e93e6",
-    description: "Time for the scenario to unfold",
+    description: "Length of the current training block",
     Icon: CalendarRange,
     describe: (value) =>
       value < 8 ? "Short block" : value < 17 ? "Training cycle" : "Long horizon",
@@ -274,70 +274,31 @@ export const INITIAL_VALUES = METRICS.reduce(
   {} as SimulationValues,
 );
 
-const DEFAULT_MUSCLE_SETS: Record<MuscleGroupId, number> = {
-  chest: 12,
-  back: 14,
-  shoulders: 10,
-  biceps: 8,
-  triceps: 8,
-  core: 8,
-  quads: 12,
-  hamstrings: 10,
-  glutes: 10,
-  calves: 8,
-};
-
 export const createMuscleSettings = (
   overrides: Partial<MuscleSettings> = {},
 ): MuscleSettings =>
   MUSCLE_GROUPS.reduce((settings, muscle) => {
     settings[muscle.id] =
       overrides[muscle.id] ?? {
-        sets: DEFAULT_MUSCLE_SETS[muscle.id],
-        priority: 2,
+        sets: 0,
+        priority: 1,
       };
     return settings;
   }, {} as MuscleSettings);
 
-export const INITIAL_SCENARIOS: Scenario[] = [
-  {
-    id: "scenario-a",
-    name: "Balanced build",
-    goal: "build",
-    experience: "intermediate",
-    daysPerWeek: 4,
+export function createDefaultTrainingProgram(): TrainingProgram {
+  return {
+    id: "training-program",
+    name: "My training program",
+    goal: GOALS[0].id,
+    experience: EXPERIENCE_LEVELS[0].id,
+    daysPerWeek: 3,
     sessionMinutes: 60,
-    equipment: "full-gym",
+    equipment: EQUIPMENT_OPTIONS[0].id,
     values: { ...INITIAL_VALUES },
-    muscles: createMuscleSettings({
-      chest: { sets: 14, priority: 3 },
-      back: { sets: 14, priority: 3 },
-      shoulders: { sets: 12, priority: 2 },
-    }),
-  },
-  {
-    id: "scenario-b",
-    name: "Recovery first",
-    goal: "recomp",
-    experience: "intermediate",
-    daysPerWeek: 4,
-    sessionMinutes: 60,
-    equipment: "full-gym",
-    values: {
-      ...INITIAL_VALUES,
-      proteinPerKg: 1.8,
-      sleepHours: 8,
-      adherence: 95,
-      calorieBalance: 0,
-      weeks: 16,
-    },
-    muscles: createMuscleSettings({
-      back: { sets: 12, priority: 3 },
-      shoulders: { sets: 10, priority: 3 },
-      core: { sets: 10, priority: 2 },
-    }),
-  },
-];
+    muscles: createMuscleSettings(),
+  };
+}
 
 const clamp = (value: number, min = 0, max = 1) =>
   Math.min(max, Math.max(min, value));
@@ -359,12 +320,12 @@ const getGoalEnergyTarget = (goal: GoalId) => {
 };
 
 /**
- * An explainable, deterministic scenario model. It visualizes relationships
+ * An explainable, deterministic training model. It visualizes relationships
  * between inputs and deliberately avoids predicting kilograms of muscle,
  * clinical body composition, or an exact future appearance.
  */
-export function derivePhysique(scenario: Scenario): PhysiqueResult {
-  const { values, muscles } = scenario;
+export function derivePhysique(program: TrainingProgram): PhysiqueResult {
+  const { values, muscles } = program;
   const adherence = values.adherence / 100;
   const proteinSupport = smoothstep(0.65, 1.65, values.proteinPerKg);
   const sleepSupport = smoothstep(4.5, 8.3, values.sleepHours);
@@ -403,7 +364,7 @@ export function derivePhysique(scenario: Scenario): PhysiqueResult {
     1,
   );
 
-  const energyTarget = getGoalEnergyTarget(scenario.goal);
+  const energyTarget = getGoalEnergyTarget(program.goal);
   const energyAlignment = clamp(
     1 - Math.abs(values.calorieBalance - energyTarget) / 900,
     0.4,
@@ -412,11 +373,11 @@ export function derivePhysique(scenario: Scenario): PhysiqueResult {
   const stimulus = clamp(volumeSignal * (0.54 + effortQuality * 0.46));
   const timeAdaptation = 1 - Math.exp(-values.weeks / 14);
   const goalGrowthFactor =
-    scenario.goal === "build"
+    program.goal === "build"
       ? 1
-      : scenario.goal === "recomp"
+      : program.goal === "recomp"
         ? 0.88
-        : scenario.goal === "strength"
+        : program.goal === "strength"
           ? 0.8
           : 0.68;
 
@@ -430,7 +391,7 @@ export function derivePhysique(scenario: Scenario): PhysiqueResult {
   );
   const leanness = clamp((42 - values.bodyFat) / 36);
   const deficitDefinition =
-    scenario.goal === "cut"
+    program.goal === "cut"
       ? smoothstep(0, 600, Math.max(0, -values.calorieBalance))
       : 0;
   const definition = clamp(
@@ -483,7 +444,7 @@ export function derivePhysique(scenario: Scenario): PhysiqueResult {
         : proteinSupport < 0.58
           ? "Protein support is trailing the selected training demand."
           : sleepDeficit > 0.45
-            ? "More sleep would improve the recovery side of this scenario."
+            ? "More sleep would improve recovery for this program."
             : stimulus < 0.35
               ? "Raise weekly sets for one or two priority muscle groups."
               : "The selected inputs support one another. Keep the plan repeatable.";
@@ -517,12 +478,14 @@ export function clampMetric(id: MetricId, value: number) {
   return Math.min(metric.max, Math.max(metric.min, stepped));
 }
 
-export function cloneScenario(scenario: Scenario): Scenario {
+export function cloneTrainingProgram(
+  program: TrainingProgram,
+): TrainingProgram {
   return {
-    ...scenario,
-    values: { ...scenario.values },
+    ...program,
+    values: { ...program.values },
     muscles: MUSCLE_GROUPS.reduce((settings, muscle) => {
-      settings[muscle.id] = { ...scenario.muscles[muscle.id] };
+      settings[muscle.id] = { ...program.muscles[muscle.id] };
       return settings;
     }, {} as MuscleSettings),
   };

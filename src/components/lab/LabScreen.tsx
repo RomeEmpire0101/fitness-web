@@ -1,17 +1,17 @@
 "use client";
 
 import {
-  ArrowRightLeft,
+  Activity,
   BarChart3,
   Check,
   ChevronRight,
-  Copy,
+  Dumbbell,
   Info,
   RotateCcw,
   Sparkles,
   Target,
 } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useState } from "react";
 import {
   CharacterEditor,
   CharacterMeasurementId,
@@ -27,26 +27,24 @@ import {
   MuscleGroupId,
   MusclePriority,
   PhysiqueResult,
-  Scenario,
+  TrainingProgram,
   getMuscleDefinition,
 } from "@/lib/simulation";
 import { MuscleMap } from "../muscles/MuscleMap";
 import { MetricCard } from "./MetricCard";
 
 type LabScreenProps = {
-  scenarios: Scenario[];
-  results: Record<Scenario["id"], PhysiqueResult>;
-  activeScenarioId: Scenario["id"];
+  program: TrainingProgram;
+  result: PhysiqueResult;
   profile: CharacterProfile;
   reducedMotion: boolean;
-  onActiveScenarioChange: (id: Scenario["id"]) => void;
-  onScenarioChange: (
-    id: Scenario["id"],
-    update: (scenario: Scenario) => Scenario,
+  onProgramChange: (
+    update: (program: TrainingProgram) => TrainingProgram,
   ) => void;
-  onResetScenarios: () => void;
+  onResetProgram: () => void;
   characterEditorOpen: boolean;
   onCharacterEditorOpenChange: (open: boolean) => void;
+  onNameChange: (name: string) => void;
   onMeasurementChange: (id: CharacterMeasurementId, value: number) => void;
   onBodyColorChange: (color: string) => void;
   onResetCharacter: () => void;
@@ -59,16 +57,15 @@ const PRIORITIES: Array<{ id: MusclePriority; label: string }> = [
 ];
 
 export function LabScreen({
-  scenarios,
-  results,
-  activeScenarioId,
+  program,
+  result,
   profile,
   reducedMotion,
-  onActiveScenarioChange,
-  onScenarioChange,
-  onResetScenarios,
+  onProgramChange,
+  onResetProgram,
   characterEditorOpen,
   onCharacterEditorOpenChange,
+  onNameChange,
   onMeasurementChange,
   onBodyColorChange,
   onResetCharacter,
@@ -77,41 +74,24 @@ export function LabScreen({
     useState<MetricId>("proteinPerKg");
   const [activeMuscle, setActiveMuscle] =
     useState<MuscleGroupId>("chest");
-  const activeScenario = scenarios.find(
-    (scenario) => scenario.id === activeScenarioId,
-  ) ?? scenarios[0];
-  const activeResult = results[activeScenario.id];
-  const selectedMuscle = activeScenario.muscles[activeMuscle];
+  const selectedMuscle = program.muscles[activeMuscle];
   const selectedMuscleDefinition = getMuscleDefinition(activeMuscle);
-  const comparison = useMemo(() => {
-    const a = results["scenario-a"];
-    const b = results["scenario-b"];
-    return {
-      adaptation: b.adaptation - a.adaptation,
-      readiness: b.readiness - a.readiness,
-      recovery: Math.round((a.recoveryLoad - b.recoveryLoad) * 100),
-    };
-  }, [results]);
-
-  const updateActiveScenario = (
-    update: (scenario: Scenario) => Scenario,
-  ) => onScenarioChange(activeScenario.id, update);
 
   const changeMetric = (id: MetricId, value: number) => {
-    updateActiveScenario((scenario) => ({
-      ...scenario,
-      values: { ...scenario.values, [id]: value },
+    onProgramChange((current) => ({
+      ...current,
+      values: { ...current.values, [id]: value },
     }));
     setActiveMetric(id);
   };
 
   const changeMuscleSets = (sets: number) => {
-    updateActiveScenario((scenario) => ({
-      ...scenario,
+    onProgramChange((current) => ({
+      ...current,
       muscles: {
-        ...scenario.muscles,
+        ...current.muscles,
         [activeMuscle]: {
-          ...scenario.muscles[activeMuscle],
+          ...current.muscles[activeMuscle],
           sets: Math.min(30, Math.max(0, Math.round(sets))),
         },
       },
@@ -119,12 +99,12 @@ export function LabScreen({
   };
 
   const changeMusclePriority = (priority: MusclePriority) => {
-    updateActiveScenario((scenario) => ({
-      ...scenario,
+    onProgramChange((current) => ({
+      ...current,
       muscles: {
-        ...scenario.muscles,
+        ...current.muscles,
         [activeMuscle]: {
-          ...scenario.muscles[activeMuscle],
+          ...current.muscles[activeMuscle],
           priority,
         },
       },
@@ -135,33 +115,20 @@ export function LabScreen({
     <div className="lab-screen screen-enter">
       <header className="screen-heading lab-heading">
         <div>
-          <span className="eyebrow">Interactive scenario studio</span>
+          <span className="eyebrow">Training response studio</span>
           <h1>Physique Lab</h1>
           <p>
-            Shape the inputs, target individual muscle groups, and compare
-            two plausible approaches.
+            Shape your training inputs and give individual muscle groups
+            focused attention.
           </p>
         </div>
         <div className="lab-heading-actions">
-          <div className="scenario-switcher" aria-label="Active scenario">
-            {scenarios.map((scenario) => (
-              <button
-                key={scenario.id}
-                type="button"
-                className={activeScenario.id === scenario.id ? "is-active" : ""}
-                onClick={() => onActiveScenarioChange(scenario.id)}
-              >
-                <span>{scenario.id === "scenario-a" ? "A" : "B"}</span>
-                {scenario.name}
-              </button>
-            ))}
-          </div>
           <button
             type="button"
             className="icon-button"
-            onClick={onResetScenarios}
-            aria-label="Reset both scenarios"
-            title="Reset both scenarios"
+            onClick={onResetProgram}
+            aria-label="Reset training program"
+            title="Reset training program"
           >
             <RotateCcw size={17} />
           </button>
@@ -172,7 +139,7 @@ export function LabScreen({
         <article className="lab-stage-card">
           <header>
             <div>
-              <span className="live-dot" />
+              <Activity size={13} aria-hidden="true" />
               Live model
             </div>
             <span>Drag to inspect</span>
@@ -180,10 +147,10 @@ export function LabScreen({
           <div className="lab-character">
             <CharacterScene
               profile={profile}
-              growth={activeResult.growth}
-              definition={activeResult.definition}
-              stimulus={activeResult.stimulus}
-              muscleSignals={activeResult.muscleSignals}
+              growth={result.growth}
+              definition={result.definition}
+              stimulus={result.stimulus}
+              muscleSignals={result.muscleSignals}
               reducedMotion={reducedMotion}
               interactive
             />
@@ -192,34 +159,35 @@ export function LabScreen({
             profile={profile}
             open={characterEditorOpen}
             onOpenChange={onCharacterEditorOpenChange}
+            onNameChange={onNameChange}
             onMeasurementChange={onMeasurementChange}
             onBodyColorChange={onBodyColorChange}
             onReset={onResetCharacter}
           />
           <div className="lab-stage-score">
             <span>
-              <b>{activeResult.adaptation}</b>
+              <b>{result.adaptation}</b>
               <small>Adaptation</small>
             </span>
             <i />
             <span>
-              <b>{activeResult.readiness}</b>
+              <b>{result.readiness}</b>
               <small>Readiness</small>
             </span>
             <i />
             <span>
-              <b>{activeResult.stage}</b>
-              <small>Scenario stage</small>
+              <b>{result.stage}</b>
+              <small>Training phase</small>
             </span>
           </div>
         </article>
 
         <div className="lab-control-column">
-          <article className="scenario-profile-card">
+          <article className="program-profile-card">
             <header>
               <span className="card-kicker">
                 <Target size={14} />
-                Scenario profile
+                Training program
               </span>
               <span className="illustrative-badge">
                 <Info size={12} />
@@ -228,13 +196,27 @@ export function LabScreen({
             </header>
             <div className="profile-select-grid">
               <label>
+                <span>Program name</span>
+                <input
+                  type="text"
+                  value={program.name}
+                  maxLength={32}
+                  onChange={(event) =>
+                    onProgramChange((current) => ({
+                      ...current,
+                      name: event.target.value,
+                    }))
+                  }
+                />
+              </label>
+              <label>
                 <span>Primary goal</span>
                 <select
-                  value={activeScenario.goal}
+                  value={program.goal}
                   onChange={(event) =>
-                    updateActiveScenario((scenario) => ({
-                      ...scenario,
-                      goal: event.target.value as Scenario["goal"],
+                    onProgramChange((current) => ({
+                      ...current,
+                      goal: event.target.value as TrainingProgram["goal"],
                     }))
                   }
                 >
@@ -248,11 +230,12 @@ export function LabScreen({
               <label>
                 <span>Training experience</span>
                 <select
-                  value={activeScenario.experience}
+                  value={program.experience}
                   onChange={(event) =>
-                    updateActiveScenario((scenario) => ({
-                      ...scenario,
-                      experience: event.target.value as Scenario["experience"],
+                    onProgramChange((current) => ({
+                      ...current,
+                      experience:
+                        event.target.value as TrainingProgram["experience"],
                     }))
                   }
                 >
@@ -264,11 +247,11 @@ export function LabScreen({
                 </select>
               </label>
             </div>
-            <div className="scenario-insight">
+            <div className="program-insight">
               <Sparkles size={15} />
               <p>
-                <strong>{activeResult.status}</strong>
-                <span>{activeResult.guidance}</span>
+                <strong>{result.status}</strong>
+                <span>{result.guidance}</span>
               </p>
             </div>
           </article>
@@ -278,7 +261,7 @@ export function LabScreen({
               <MetricCard
                 key={metric.id}
                 metric={metric}
-                value={activeScenario.values[metric.id]}
+                value={program.values[metric.id]}
                 isActive={activeMetric === metric.id}
                 onChange={changeMetric}
                 onActivate={setActiveMetric}
@@ -303,18 +286,13 @@ export function LabScreen({
         <div className="muscle-studio__grid">
           <MuscleMap
             activeMuscle={activeMuscle}
-            muscles={activeScenario.muscles}
+            muscles={program.muscles}
             onSelect={setActiveMuscle}
           />
 
           <div className="muscle-editor">
             <header>
-              <span
-                className="muscle-editor__color"
-                style={{
-                  background: selectedMuscleDefinition?.color,
-                }}
-              />
+              <Target className="muscle-editor__icon" size={18} />
               <div>
                 <span>Selected muscle</span>
                 <h3>{selectedMuscleDefinition?.label}</h3>
@@ -365,7 +343,7 @@ export function LabScreen({
               <BarChart3 size={16} />
               <p>
                 {selectedMuscle.sets < 6
-                  ? "A low-volume maintenance signal for this mockup."
+                  ? "A low-volume maintenance signal for this program."
                   : selectedMuscle.sets <= 18
                     ? "A productive range with room to adjust from feedback."
                     : "Higher volume adds diminishing returns and recovery cost."}
@@ -375,7 +353,7 @@ export function LabScreen({
 
           <div className="muscle-list" aria-label="All muscle groups">
             {MUSCLE_GROUPS.map((muscle) => {
-              const setting = activeScenario.muscles[muscle.id];
+              const setting = program.muscles[muscle.id];
               return (
                 <button
                   key={muscle.id}
@@ -383,12 +361,7 @@ export function LabScreen({
                   className={activeMuscle === muscle.id ? "is-active" : ""}
                   onClick={() => setActiveMuscle(muscle.id)}
                 >
-                  <span
-                    style={{
-                      background: muscle.color,
-                      opacity: 0.35 + Math.min(0.65, setting.sets / 30),
-                    }}
-                  />
+                  <Dumbbell size={15} aria-hidden="true" />
                   <p>
                     <strong>{muscle.shortLabel}</strong>
                     <small>
@@ -406,121 +379,6 @@ export function LabScreen({
         </div>
       </section>
 
-      <section className="comparison-section panel-card">
-        <header className="panel-card__header">
-          <div>
-            <span className="eyebrow">Side-by-side review</span>
-            <h2>Compare scenarios</h2>
-          </div>
-          <span className="compare-summary">
-            <ArrowRightLeft size={15} />
-            B is {Math.abs(comparison.readiness)} points{" "}
-            {comparison.readiness >= 0 ? "more" : "less"} ready
-          </span>
-        </header>
-
-        <div className="scenario-comparison-grid">
-          {scenarios.map((scenario) => {
-            const result = results[scenario.id];
-            const scenarioLetter =
-              scenario.id === "scenario-a" ? "A" : "B";
-            return (
-              <article
-                key={scenario.id}
-                className={`compare-card compare-card--${scenarioLetter.toLowerCase()}`}
-              >
-                <header>
-                  <span>{scenarioLetter}</span>
-                  <div>
-                    <h3>{scenario.name}</h3>
-                    <p>
-                      {GOALS.find((goal) => goal.id === scenario.goal)?.label} ·{" "}
-                      {scenario.daysPerWeek} days/week
-                    </p>
-                  </div>
-                  <button
-                    type="button"
-                    onClick={() => onActiveScenarioChange(scenario.id)}
-                  >
-                    Edit
-                    <ChevronRight size={13} />
-                  </button>
-                </header>
-                <div className="compare-score-row">
-                  <span>
-                    <b>{result.adaptation}</b>
-                    <small>Adaptation</small>
-                  </span>
-                  <span>
-                    <b>{result.readiness}</b>
-                    <small>Readiness</small>
-                  </span>
-                  <span>
-                    <b>{Math.round(result.balance * 100)}</b>
-                    <small>Balance</small>
-                  </span>
-                </div>
-                <div className="compare-bars">
-                  {[
-                    ["Growth", result.growth],
-                    ["Definition", result.definition],
-                    ["Stimulus", result.stimulus],
-                  ].map(([label, value]) => (
-                    <div key={label as string}>
-                      <span>
-                        {label as string}
-                        <b>{Math.round((value as number) * 100)}</b>
-                      </span>
-                      <i>
-                        <em style={{ width: `${(value as number) * 100}%` }} />
-                      </i>
-                    </div>
-                  ))}
-                </div>
-                <footer>
-                  <span>{scenario.values.proteinPerKg} g/kg protein</span>
-                  <span>{result.averageSets.toFixed(1)} avg sets</span>
-                  <span>{scenario.values.weeks} weeks</span>
-                </footer>
-              </article>
-            );
-          })}
-
-          <aside className="comparison-delta">
-            <span className="card-kicker">
-              <Copy size={14} />
-              Key differences
-            </span>
-            <div>
-              <span>
-                <b>
-                  {comparison.adaptation >= 0 ? "+" : ""}
-                  {comparison.adaptation}
-                </b>
-                adaptation points in B
-              </span>
-              <span>
-                <b>
-                  {comparison.readiness >= 0 ? "+" : ""}
-                  {comparison.readiness}
-                </b>
-                readiness points in B
-              </span>
-              <span>
-                <b>
-                  {comparison.recovery >= 0 ? "−" : "+"}
-                  {Math.abs(comparison.recovery)}%
-                </b>
-                recovery load in B
-              </span>
-            </div>
-            <p>
-              These scores compare input relationships. They are not forecasts
-              of exact physical outcomes.
-            </p>
-          </aside>
-        </div>
-      </section>
     </div>
   );
 }

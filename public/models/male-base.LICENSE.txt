@@ -1,0 +1,17 @@
+Male human base mesh
+
+Source:
+https://commons.wikimedia.org/wiki/File:Body_male_realistic_by_Dan_Ulrich_(CC0).stl
+
+Original creators:
+Blender Studio, Dan Ulrich, Paul Kotelevets, Tonatiuh de San Julián,
+and Julien Kaspar.
+
+License:
+Creative Commons CC0 1.0 Universal Public Domain Dedication.
+https://creativecommons.org/publicdomain/zero/1.0/
+
+Web optimization:
+The original high-resolution STL was coordinate-normalized and simplified to
+140,000 triangles for interactive browser rendering. No texture or identifying
+personal data is included.

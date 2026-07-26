@@ -71,10 +71,10 @@ export default function CharacterScene(props: CharacterSceneProps) {
       <SceneLighting />
       <RegisteredCharacterModel {...props} />
       <ContactShadows
-        position={[0, -2.3, 0]}
+        position={[0, -2.48, 0]}
         scale={5.2}
-        opacity={0.38}
-        blur={2.8}
+        opacity={0.32}
+        blur={2.4}
         far={4}
         color="#000000"
       />
@@ -83,11 +83,9 @@ export default function CharacterScene(props: CharacterSceneProps) {
           makeDefault
           enablePan={false}
           enableZoom={false}
-          minPolarAngle={Math.PI / 2 - 0.16}
-          maxPolarAngle={Math.PI / 2 + 0.16}
-          minAzimuthAngle={-0.65}
-          maxAzimuthAngle={0.65}
-          rotateSpeed={0.38}
+          minPolarAngle={Math.PI / 2 - 0.22}
+          maxPolarAngle={Math.PI / 2 + 0.22}
+          rotateSpeed={0.46}
           dampingFactor={0.06}
           enableDamping
           target={[0, 0.05, 0]}
