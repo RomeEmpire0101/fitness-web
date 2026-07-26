@@ -1,0 +1,30 @@
+# dependencies
+/node_modules
+
+# next.js
+/.next/
+/out/
+
+# production
+/build
+/dist
+
+# local
+.DS_Store
+*.pem
+*.log
+
+# environment
+.env*
+!.env.example
+
+# vercel
+.vercel
+
+# typescript
+*.tsbuildinfo
+next-env.d.ts
+
+# Sites artifacts
+/.openai/*
+!/.openai/hosting.json
