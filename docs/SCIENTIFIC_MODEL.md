@@ -13,7 +13,9 @@ Defaults are population priors. Age, sex, training history, energy intake,
 protein, sleep, adherence, projection length, body measurements, body-fat
 method, and every muscle's exercise, direct sets, indirect sets, repetitions,
 RIR, and frequency must be confirmed before the UI reports a complete-input
-estimate. Each missing value increases predictive variance.
+estimate. Each muscle row has an explicit confirmation action, and editing any
+field invalidates that confirmation. Each missing value increases predictive
+variance.
 
 ## Regional model
 

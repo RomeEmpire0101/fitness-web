@@ -4347,7 +4347,10 @@ select:focus-visible,
 
 .muscle-dose-row {
   display: grid;
-  grid-template-columns: minmax(240px, 1.8fr) repeat(5, minmax(74px, 0.5fr));
+  grid-template-columns:
+    minmax(240px, 1.8fr)
+    repeat(5, minmax(68px, 0.5fr))
+    minmax(76px, 0.55fr);
   align-items: center;
   gap: 9px;
   min-height: 66px;
@@ -4412,6 +4415,29 @@ select:focus-visible,
 .muscle-dose-row input:focus {
   border-color: #a8a2e8;
   background: #fff;
+}
+
+.confirm-muscle-row {
+  min-height: 33px;
+  padding: 0 8px;
+  border: 1px solid #d9d6e6;
+  border-radius: 9px;
+  color: #544d8e;
+  background: #f4f2ff;
+  font-size: 7px;
+  font-weight: 800;
+}
+
+.confirm-muscle-row:hover:not(:disabled) {
+  border-color: #b9b2e4;
+  background: #ece9ff;
+}
+
+.confirm-muscle-row:disabled {
+  color: #287d60;
+  border-color: #cce5da;
+  background: #f1faf6;
+  cursor: default;
 }
 
 .mobile-field-label {
@@ -4720,7 +4746,10 @@ select:focus-visible,
   }
 
   .muscle-dose-row {
-    grid-template-columns: minmax(210px, 1.5fr) repeat(5, minmax(63px, 0.5fr));
+    grid-template-columns:
+      minmax(210px, 1.5fr)
+      repeat(5, minmax(60px, 0.5fr))
+      minmax(72px, 0.55fr);
     gap: 6px;
   }
 

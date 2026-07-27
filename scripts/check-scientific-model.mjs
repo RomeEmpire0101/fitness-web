@@ -127,6 +127,15 @@ assert(
   "Set-dose response must show nonlinear diminishing returns.",
 );
 
+const labSource = await import("node:fs/promises").then(({ readFile }) =>
+  readFile(new URL("../src/components/lab/LabScreen.tsx", import.meta.url), "utf8"),
+);
+assert(
+  labSource.includes("Confirm ${muscle.label} inputs") &&
+    labSource.includes("current.confirmedMuscles.filter("),
+  "Muscle-dose rows must require explicit confirmation and invalidate it after edits.",
+);
+
 console.log(
   `Scientific model checks passed: holdout MAE ${MODEL_VALIDATION.maePercentPoints} pp across ${MODEL_VALIDATION.holdoutCohorts} cohorts.`,
 );

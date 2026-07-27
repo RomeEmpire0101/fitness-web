@@ -210,6 +210,17 @@ export function LabScreen({
           [field]: value,
         },
       },
+      // Any edit invalidates the previous row acknowledgement. The complete
+      // exercise/dose row must be explicitly confirmed again below.
+      confirmedMuscles: current.confirmedMuscles.filter(
+        (muscleId) => muscleId !== id,
+      ),
+    }));
+  };
+
+  const confirmMuscle = (id: MuscleGroupId) => {
+    onProgramChange((current) => ({
+      ...current,
       confirmedMuscles: current.confirmedMuscles.includes(id)
         ? current.confirmedMuscles
         : [...current.confirmedMuscles, id],
@@ -556,6 +567,7 @@ export function LabScreen({
               <span>Reps</span>
               <span>RIR</span>
               <span>Frequency</span>
+              <span>Status</span>
             </div>
             {MUSCLE_GROUPS.map((muscle) => {
               const setting = program.muscles[muscle.id];
@@ -620,6 +632,15 @@ export function LabScreen({
                       />
                     </label>
                   ))}
+                  <button
+                    type="button"
+                    className="confirm-muscle-row"
+                    disabled={confirmedMuscles.has(muscle.id)}
+                    onClick={() => confirmMuscle(muscle.id)}
+                    aria-label={`Confirm ${muscle.label} inputs`}
+                  >
+                    {confirmedMuscles.has(muscle.id) ? "Confirmed" : "Confirm row"}
+                  </button>
                 </div>
               );
             })}
