@@ -52,7 +52,9 @@ export function FitnessLab() {
     profile,
     updateName,
     updateMeasurement,
-    updateBodyColor,
+    updateBodyType,
+    updateAppearance,
+    updateWardrobe,
     resetProfile,
   } = useCharacterProfile();
 
@@ -208,7 +210,9 @@ export function FitnessLab() {
               onCharacterEditorOpenChange={setCharacterEditorOpen}
               onNameChange={updateName}
               onMeasurementChange={updateMeasurement}
-              onBodyColorChange={updateBodyColor}
+              onBodyTypeChange={updateBodyType}
+              onAppearanceChange={updateAppearance}
+              onWardrobeChange={updateWardrobe}
               onResetCharacter={resetProfile}
             />
           )}

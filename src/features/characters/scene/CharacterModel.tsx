@@ -10,9 +10,10 @@ import {
   CharacterVisualization,
 } from "../types";
 import {
-  MaleAnatomyUniforms,
-  RealisticMaleBody,
+  AnatomyUniforms,
+  RealisticBody,
 } from "./RealisticMaleBody";
+import { CharacterLayers } from "./CharacterLayers";
 
 export type CharacterModelProps = CharacterVisualization & {
   profile: CharacterProfile;
@@ -42,12 +43,14 @@ export function CharacterModel({
     [profile.measurements],
   );
   // Shader uniforms must retain object identity for the compiled WebGL program.
-  const anatomy = useMemo<MaleAnatomyUniforms>(
+  const anatomy = useMemo<AnatomyUniforms>(
     () => ({
       uGrowth: { value: growth },
       uDefinition: { value: definition },
       uStimulus: { value: stimulus },
       uWidth: { value: morphology.widthScale },
+      uFat: { value: morphology.fatLevel },
+      uFeminine: { value: profile.bodyType === "female" ? 1 : 0 },
       uChest: { value: muscleSignals?.chest ?? growth },
       uBack: { value: muscleSignals?.back ?? growth },
       uShoulders: { value: muscleSignals?.shoulders ?? growth },
@@ -67,6 +70,8 @@ export function CharacterModel({
   const currentStimulus = useRef(stimulus);
   const currentHeight = useRef(morphology.heightScale);
   const currentWidth = useRef(morphology.widthScale);
+  const currentFat = useRef(morphology.fatLevel);
+  const currentFeminine = useRef(profile.bodyType === "female" ? 1 : 0);
 
   useFrame(({ clock }, delta) => {
     const g = damp(currentGrowth.current, growth, 4.8, delta);
@@ -84,11 +89,25 @@ export function CharacterModel({
       5.2,
       delta,
     );
+    const fat = damp(
+      currentFat.current,
+      morphology.fatLevel,
+      4.6,
+      delta,
+    );
+    const feminine = damp(
+      currentFeminine.current,
+      profile.bodyType === "female" ? 1 : 0,
+      5.2,
+      delta,
+    );
     currentGrowth.current = g;
     currentDefinition.current = d;
     currentStimulus.current = s;
     currentHeight.current = height;
     currentWidth.current = width;
+    currentFat.current = fat;
+    currentFeminine.current = feminine;
 
     const elapsed = clock.getElapsedTime();
     const inhale = reducedMotion ? 0 : Math.sin(elapsed * 1.68) * 0.5 + 0.5;
@@ -113,6 +132,8 @@ export function CharacterModel({
     anatomy.uDefinition.value = d;
     anatomy.uStimulus.value = s;
     anatomy.uWidth.value = width;
+    anatomy.uFat.value = fat;
+    anatomy.uFeminine.value = feminine;
     anatomy.uChest.value = damp(anatomy.uChest.value, signal("chest"), 5, delta);
     anatomy.uBack.value = damp(anatomy.uBack.value, signal("back"), 5, delta);
     anatomy.uShoulders.value = damp(
@@ -159,9 +180,14 @@ export function CharacterModel({
     <group ref={root}>
       <group ref={bodyScale}>
         <group ref={breath}>
-          <RealisticMaleBody
+          <RealisticBody
             appearance={profile.appearance}
+            bodyType={profile.bodyType}
             anatomy={anatomy}
+          />
+          <CharacterLayers
+            profile={profile}
+            morphology={morphology}
           />
         </group>
       </group>

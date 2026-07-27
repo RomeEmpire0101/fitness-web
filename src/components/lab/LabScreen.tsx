@@ -13,15 +13,20 @@ import {
 } from "lucide-react";
 import { useState } from "react";
 import {
+  CharacterAppearance,
+  CharacterBodyType,
   CharacterEditor,
   CharacterMeasurementId,
   CharacterProfile,
+  CharacterWardrobe,
 } from "@/features/characters";
 import CharacterScene from "@/features/characters/scene/CharacterScene";
 import {
   EXPERIENCE_LEVELS,
+  GoalId,
   GOALS,
   METRICS,
+  MetricDefinition,
   MUSCLE_GROUPS,
   MetricId,
   MuscleGroupId,
@@ -46,7 +51,15 @@ type LabScreenProps = {
   onCharacterEditorOpenChange: (open: boolean) => void;
   onNameChange: (name: string) => void;
   onMeasurementChange: (id: CharacterMeasurementId, value: number) => void;
-  onBodyColorChange: (color: string) => void;
+  onBodyTypeChange: (bodyType: CharacterBodyType) => void;
+  onAppearanceChange: <K extends keyof CharacterAppearance>(
+    id: K,
+    value: CharacterAppearance[K],
+  ) => void;
+  onWardrobeChange: <K extends keyof CharacterWardrobe>(
+    id: K,
+    value: CharacterWardrobe[K],
+  ) => void;
   onResetCharacter: () => void;
 };
 
@@ -55,6 +68,45 @@ const PRIORITIES: Array<{ id: MusclePriority; label: string }> = [
   { id: 2, label: "Grow" },
   { id: 3, label: "Focus" },
 ];
+
+const INPUT_GROUPS: Array<{
+  id: MetricDefinition["group"];
+  step: string;
+  title: string;
+  description: string;
+}> = [
+  {
+    id: "training",
+    step: "01",
+    title: "How you train",
+    description: "Use the effort and consistency you can repeat in a normal week.",
+  },
+  {
+    id: "recovery",
+    step: "02",
+    title: "Recovery & nutrition",
+    description: "Describe the habits that support the work you do in the gym.",
+  },
+  {
+    id: "startingPoint",
+    step: "03",
+    title: "Starting point & timeline",
+    description: "Give the model enough context to illustrate your direction.",
+  },
+];
+
+const getCalorieGuide = (goal: GoalId) => {
+  if (goal === "build") {
+    return "For Build muscle, a small positive number matches the selected goal.";
+  }
+  if (goal === "cut") {
+    return "For Reduce body fat, a moderate negative number matches the selected goal.";
+  }
+  if (goal === "strength") {
+    return "For Get stronger, maintenance or a small positive number is a simple starting point.";
+  }
+  return "For Recompose, staying close to maintenance matches the selected goal.";
+};
 
 export function LabScreen({
   program,
@@ -67,7 +119,9 @@ export function LabScreen({
   onCharacterEditorOpenChange,
   onNameChange,
   onMeasurementChange,
-  onBodyColorChange,
+  onBodyTypeChange,
+  onAppearanceChange,
+  onWardrobeChange,
   onResetCharacter,
 }: LabScreenProps) {
   const [activeMetric, setActiveMetric] =
@@ -76,6 +130,42 @@ export function LabScreen({
     useState<MuscleGroupId>("chest");
   const selectedMuscle = program.muscles[activeMuscle];
   const selectedMuscleDefinition = getMuscleDefinition(activeMuscle);
+
+  const describeMetricInPlainLanguage = (
+    metric: MetricDefinition,
+    value: number,
+  ) => {
+    switch (metric.id) {
+      case "proteinPerKg":
+        return `About ${Math.round(
+          value * profile.measurements.weightKg,
+        )} g per day at your saved ${profile.measurements.weightKg} kg body weight.`;
+      case "rir":
+        return value === 0
+          ? "You stop when another clean rep is not possible."
+          : `You stop when you could still do about ${value} more clean ${
+              value === 1 ? "rep" : "reps"
+            }.`;
+      case "weeks": {
+        const months = value / 4.3;
+        return `${value} weeks is about ${
+          months < 2 ? months.toFixed(1) : Math.round(months)
+        } months.`;
+      }
+      case "bodyFat":
+        return `${value}% is used only to adjust the model's visual definition.`;
+      case "sleepHours":
+        return `${value.toFixed(1).replace(".0", "")} hours on an average night.`;
+      case "adherence":
+        return `About ${Math.round(value / 10)} of every 10 planned workouts completed.`;
+      case "calorieBalance":
+        return value === 0
+          ? "You eat about the amount that keeps your weight stable."
+          : `About ${Math.abs(value)} calories ${
+              value < 0 ? "below" : "above"
+            } maintenance each day.`;
+    }
+  };
 
   const changeMetric = (id: MetricId, value: number) => {
     onProgramChange((current) => ({
@@ -161,7 +251,9 @@ export function LabScreen({
             onOpenChange={onCharacterEditorOpenChange}
             onNameChange={onNameChange}
             onMeasurementChange={onMeasurementChange}
-            onBodyColorChange={onBodyColorChange}
+            onBodyTypeChange={onBodyTypeChange}
+            onAppearanceChange={onAppearanceChange}
+            onWardrobeChange={onWardrobeChange}
             onReset={onResetCharacter}
           />
           <div className="lab-stage-score">
@@ -256,18 +348,59 @@ export function LabScreen({
             </div>
           </article>
 
-          <div className="metric-grid">
-            {METRICS.map((metric) => (
-              <MetricCard
-                key={metric.id}
-                metric={metric}
-                value={program.values[metric.id]}
-                isActive={activeMetric === metric.id}
-                onChange={changeMetric}
-                onActivate={setActiveMetric}
-              />
-            ))}
-          </div>
+          <section
+            className="input-workbench"
+            aria-labelledby="guided-inputs-title"
+          >
+            <header className="input-workbench__header">
+              <div>
+                <span className="eyebrow">Guided inputs</span>
+                <h2 id="guided-inputs-title">Tell us about your routine</h2>
+                <p>
+                  Answer in everyday terms. Each control translates your choice
+                  before it changes the model.
+                </p>
+              </div>
+              <span className="input-count">7 explained inputs</span>
+            </header>
+
+            <div className="input-group-list">
+              {INPUT_GROUPS.map((group) => (
+                <section className="input-group" key={group.id}>
+                  <header className="input-group__header">
+                    <span>{group.step}</span>
+                    <div>
+                      <h3>{group.title}</h3>
+                      <p>{group.description}</p>
+                    </div>
+                  </header>
+                  <div className="metric-grid">
+                    {METRICS.filter((metric) => metric.group === group.id).map(
+                      (metric) => (
+                        <MetricCard
+                          key={metric.id}
+                          metric={metric}
+                          value={program.values[metric.id]}
+                          isActive={activeMetric === metric.id}
+                          plainLanguage={describeMetricInPlainLanguage(
+                            metric,
+                            program.values[metric.id],
+                          )}
+                          recommendation={
+                            metric.id === "calorieBalance"
+                              ? getCalorieGuide(program.goal)
+                              : undefined
+                          }
+                          onChange={changeMetric}
+                          onActivate={setActiveMetric}
+                        />
+                      ),
+                    )}
+                  </div>
+                </section>
+              ))}
+            </div>
+          </section>
         </div>
       </section>
 

@@ -438,7 +438,7 @@ export function PlanScreen({
                       </label>
                       <span>
                         <b>{program.values.rir}</b>
-                        <small>RIR</small>
+                        <small>reps left</small>
                       </span>
                       <button
                         type="button"

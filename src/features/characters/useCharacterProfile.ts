@@ -7,13 +7,17 @@ import {
 } from "react";
 import {
   CHARACTER_STORAGE_KEY,
+  LEGACY_CHARACTER_STORAGE_KEY,
   clampMeasurement,
   createDefaultCharacter,
   normalizeCharacterProfile,
 } from "./config";
 import {
+  CharacterAppearance,
+  CharacterBodyType,
   CharacterMeasurementId,
   CharacterProfile,
+  CharacterWardrobe,
 } from "./types";
 
 const CHARACTER_CHANGE_EVENT = "physique:character-change";
@@ -22,7 +26,11 @@ let memorySnapshot = DEFAULT_SNAPSHOT;
 
 function readStoredSnapshot() {
   try {
-    return window.localStorage.getItem(CHARACTER_STORAGE_KEY) ?? memorySnapshot;
+    return (
+      window.localStorage.getItem(CHARACTER_STORAGE_KEY) ??
+      window.localStorage.getItem(LEGACY_CHARACTER_STORAGE_KEY) ??
+      memorySnapshot
+    );
   } catch {
     return memorySnapshot;
   }
@@ -112,6 +120,48 @@ export function useCharacterProfile() {
     [updateProfile],
   );
 
+  const updateBodyType = useCallback(
+    (bodyType: CharacterBodyType) => {
+      updateProfile((current) => ({
+        ...current,
+        bodyType,
+      }));
+    },
+    [updateProfile],
+  );
+
+  const updateAppearance = useCallback(
+    <K extends keyof CharacterAppearance>(
+      id: K,
+      value: CharacterAppearance[K],
+    ) => {
+      updateProfile((current) => ({
+        ...current,
+        appearance: {
+          ...current.appearance,
+          [id]: value,
+        },
+      }));
+    },
+    [updateProfile],
+  );
+
+  const updateWardrobe = useCallback(
+    <K extends keyof CharacterWardrobe>(
+      id: K,
+      value: CharacterWardrobe[K],
+    ) => {
+      updateProfile((current) => ({
+        ...current,
+        wardrobe: {
+          ...current.wardrobe,
+          [id]: value,
+        },
+      }));
+    },
+    [updateProfile],
+  );
+
   const resetProfile = useCallback(() => {
     writeStoredProfile(createDefaultCharacter());
   }, []);
@@ -121,6 +171,9 @@ export function useCharacterProfile() {
     updateMeasurement,
     updateName,
     updateBodyColor,
+    updateBodyType,
+    updateAppearance,
+    updateWardrobe,
     resetProfile,
   };
 }

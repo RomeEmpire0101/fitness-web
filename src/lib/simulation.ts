@@ -63,8 +63,9 @@ export type TrainingProgram = {
 
 export type MetricDefinition = {
   id: MetricId;
+  group: "training" | "recovery" | "startingPoint";
   label: string;
-  shortLabel: string;
+  question: string;
   unit: string;
   shortUnit: string;
   min: number;
@@ -73,6 +74,9 @@ export type MetricDefinition = {
   initial: number;
   accent: string;
   description: string;
+  lowLabel: string;
+  highLabel: string;
+  recommendation: string;
   Icon: LucideIcon;
   describe: (value: number) => string;
 };
@@ -132,52 +136,61 @@ export const EQUIPMENT_OPTIONS: Array<{
 export const METRICS: MetricDefinition[] = [
   {
     id: "proteinPerKg",
-    label: "Daily protein",
-    shortLabel: "Protein",
-    unit: "grams per kilogram",
+    group: "recovery",
+    label: "Protein intake",
+    question: "How much protein do you eat each day?",
+    unit: "grams per kilogram of body weight",
     shortUnit: "g/kg",
     min: 0.6,
     max: 2.6,
     step: 0.1,
     initial: 1.6,
     accent: "#6f6af8",
-    description: "Relative to body weight",
+    description: "Use your body weight to make different people comparable.",
+    lowLabel: "Lower protein",
+    highLabel: "Higher protein",
+    recommendation: "The model's well-supported zone is 1.5–2.1 g/kg.",
     Icon: Beef,
     describe: (value) =>
       value < 1.1
-        ? "Low support"
+        ? "May limit recovery"
         : value < 1.5
-          ? "Building"
+          ? "Some support"
           : value <= 2.1
-            ? "Well supported"
-            : "Upper range",
+            ? "Supports training"
+            : "Above model target",
   },
   {
     id: "rir",
-    label: "Reps in reserve",
-    shortLabel: "Effort",
+    group: "training",
+    label: "Reps left after each set",
+    question: "How hard do your working sets feel?",
     unit: "reps in reserve",
-    shortUnit: "RIR",
+    shortUnit: "reps left",
     min: 0,
     max: 5,
     step: 1,
     initial: 2,
     accent: "#f3925d",
-    description: "Effort left at the end of a set",
+    description: "Estimate how many clean reps you could still do when you stop.",
+    lowLabel: "No reps left",
+    highLabel: "5 reps left",
+    recommendation: "A useful default for most working sets is 1–3 reps left.",
     Icon: Gauge,
     describe: (value) =>
       value === 0
-        ? "At failure"
+        ? "Maximum effort"
         : value <= 2
-          ? "Hard"
+          ? "Challenging"
           : value <= 3
-            ? "Productive"
-            : "Conservative",
+            ? "Moderate effort"
+            : "Plenty left",
   },
   {
     id: "weeks",
-    label: "Training timeline",
-    shortLabel: "Timeline",
+    group: "startingPoint",
+    label: "Plan length",
+    question: "How long will you follow this plan?",
     unit: "weeks",
     shortUnit: "weeks",
     min: 4,
@@ -185,15 +198,23 @@ export const METRICS: MetricDefinition[] = [
     step: 1,
     initial: 12,
     accent: "#4e93e6",
-    description: "Length of the current training block",
+    description: "Set the time window you want the model to illustrate.",
+    lowLabel: "4 weeks",
+    highLabel: "52 weeks",
+    recommendation: "Eight to sixteen weeks is an easy planning window to review.",
     Icon: CalendarRange,
     describe: (value) =>
-      value < 8 ? "Short block" : value < 17 ? "Training cycle" : "Long horizon",
+      value < 8
+        ? "Short check-in"
+        : value < 17
+          ? "Training block"
+          : "Long-range view",
   },
   {
     id: "bodyFat",
-    label: "Estimated body fat",
-    shortLabel: "Body fat",
+    group: "startingPoint",
+    label: "Estimated body-fat level",
+    question: "What is your rough body-fat estimate?",
     unit: "percent",
     shortUnit: "%",
     min: 6,
@@ -201,31 +222,47 @@ export const METRICS: MetricDefinition[] = [
     step: 1,
     initial: 18,
     accent: "#31a889",
-    description: "A visual estimate, not a diagnosis",
+    description: "A rough visual estimate is enough; this is not a health assessment.",
+    lowLabel: "More defined",
+    highLabel: "Less defined",
+    recommendation: "If you are unsure, leave the default and treat the result as illustrative.",
     Icon: Activity,
     describe: (value) =>
-      value < 13 ? "Lean range" : value < 23 ? "Moderate range" : "Higher range",
+      value < 13
+        ? "More definition"
+        : value < 23
+          ? "Middle estimate"
+          : "Less definition",
   },
   {
     id: "sleepHours",
-    label: "Average sleep",
-    shortLabel: "Sleep",
+    group: "recovery",
+    label: "Sleep per night",
+    question: "How much sleep do you usually get?",
     unit: "hours per night",
-    shortUnit: "hrs",
+    shortUnit: "hours",
     min: 4,
     max: 10,
     step: 0.5,
     initial: 7.5,
     accent: "#7866d8",
-    description: "A recovery-capacity input",
+    description: "Use your normal week, not your best or worst night.",
+    lowLabel: "4 hours",
+    highLabel: "10 hours",
+    recommendation: "Pick the amount you can consistently get on an average night.",
     Icon: MoonStar,
     describe: (value) =>
-      value < 6 ? "Recovery limited" : value < 7.5 ? "Adequate" : "Well supported",
+      value < 6
+        ? "Recovery may lag"
+        : value < 7.5
+          ? "Some recovery"
+          : "Strong recovery",
   },
   {
     id: "adherence",
-    label: "Plan adherence",
-    shortLabel: "Adherence",
+    group: "training",
+    label: "Expected workout consistency",
+    question: "How many planned workouts will you complete?",
     unit: "percent completed",
     shortUnit: "%",
     min: 40,
@@ -233,26 +270,41 @@ export const METRICS: MetricDefinition[] = [
     step: 5,
     initial: 85,
     accent: "#2f9a61",
-    description: "How much of the plan is completed",
+    description: "Choose a realistic average, including busy weeks and missed sessions.",
+    lowLabel: "4 in 10",
+    highLabel: "Every workout",
+    recommendation: "Use your realistic average rather than a perfect-week target.",
     Icon: Target,
     describe: (value) =>
-      value < 65 ? "Inconsistent" : value < 85 ? "Developing" : "Repeatable",
+      value < 65
+        ? "Often interrupted"
+        : value < 85
+          ? "Mostly consistent"
+          : "Very consistent",
   },
   {
     id: "calorieBalance",
-    label: "Daily calorie balance",
-    shortLabel: "Energy",
+    group: "recovery",
+    label: "Calories versus maintenance",
+    question: "Are you eating less, the same, or more?",
     unit: "kilocalories per day",
-    shortUnit: "kcal",
+    shortUnit: "kcal/day",
     min: -700,
     max: 500,
     step: 50,
     initial: 150,
     accent: "#dc715d",
-    description: "Relative to estimated maintenance",
+    description: "Compare your intake with the amount that keeps your weight stable.",
+    lowLabel: "Eat less",
+    highLabel: "Eat more",
+    recommendation: "Zero means maintenance; negative is less and positive is more.",
     Icon: Flame,
     describe: (value) =>
-      value < -150 ? "Deficit" : value > 150 ? "Surplus" : "Near maintenance",
+      value < -150
+        ? "Eating less"
+        : value > 150
+          ? "Eating more"
+          : "Near maintenance",
   },
 ];
 

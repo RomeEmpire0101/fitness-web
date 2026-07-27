@@ -15,6 +15,8 @@ type MetricCardProps = {
   metric: MetricDefinition;
   value: number;
   isActive: boolean;
+  plainLanguage: string;
+  recommendation?: string;
   onChange: (id: MetricId, value: number) => void;
   onActivate: (id: MetricId) => void;
 };
@@ -23,6 +25,8 @@ export function MetricCard({
   metric,
   value,
   isActive,
+  plainLanguage,
+  recommendation,
   onChange,
   onActivate,
 }: MetricCardProps) {
@@ -94,36 +98,42 @@ export function MetricCard({
         <span className="metric-card__icon" aria-hidden="true">
           <Icon size={16} strokeWidth={1.9} />
         </span>
-        <span>
-          <strong>{metric.shortLabel}</strong>
-          <small>{metric.describe(value)}</small>
-        </span>
+        <div>
+          <strong>{metric.question}</strong>
+          <small>{metric.description}</small>
+        </div>
+        <span className="metric-card__status">{metric.describe(value)}</span>
       </header>
 
-      <div className="metric-card__value">
-        <input
-          id={`${metric.id}-number`}
-          type="text"
-          inputMode="decimal"
-          value={draft}
-          onFocus={() => {
-            editing.current = true;
-            onActivate(metric.id);
-          }}
-          onChange={updateDraft}
-          onBlur={commitDraft}
-          onKeyDown={handleNumberKey}
-          aria-label={`${metric.label} value`}
-          aria-describedby={`${metric.id}-description`}
-        />
-        <span>{metric.shortUnit}</span>
+      <div className="metric-card__answer">
+        <label className="metric-card__value" htmlFor={`${metric.id}-number`}>
+          <span>Your answer</span>
+          <span>
+            <input
+              id={`${metric.id}-number`}
+              type="text"
+              inputMode={metric.step < 1 ? "decimal" : "numeric"}
+              value={draft}
+              onFocus={() => {
+                editing.current = true;
+                onActivate(metric.id);
+              }}
+              onChange={updateDraft}
+              onBlur={commitDraft}
+              onKeyDown={handleNumberKey}
+              aria-describedby={`${metric.id}-description`}
+            />
+            <b>{metric.shortUnit}</b>
+          </span>
+        </label>
+        <div className="metric-card__translation">
+          <span>What that means</span>
+          <strong>{plainLanguage}</strong>
+        </div>
       </div>
 
       <label className="metric-card__range">
         <span className="sr-only">Adjust {metric.label}</span>
-        <span aria-hidden="true">
-          <i />
-        </span>
         <input
           id={`${metric.id}-range`}
           type="range"
@@ -134,13 +144,15 @@ export function MetricCard({
           onChange={updateRange}
           aria-valuetext={`${value.toFixed(precision)} ${metric.unit}`}
         />
+        <span className="metric-card__scale" aria-hidden="true">
+          <span>{metric.lowLabel}</span>
+          <span>{metric.highLabel}</span>
+        </span>
       </label>
 
       <footer id={`${metric.id}-description`}>
-        <span>{metric.description}</span>
-        <b>
-          {metric.id === "rir" ? `RPE ${10 - value}` : `${metric.min}–${metric.max}`}
-        </b>
+        <span>Helpful guide</span>
+        <strong>{recommendation ?? metric.recommendation}</strong>
       </footer>
     </article>
   );
