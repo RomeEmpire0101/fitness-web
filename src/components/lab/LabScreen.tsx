@@ -6,9 +6,7 @@ import {
   Check,
   ChevronRight,
   Dumbbell,
-  Info,
   RotateCcw,
-  Sparkles,
   Target,
 } from "lucide-react";
 import { useState } from "react";
@@ -18,17 +16,10 @@ import {
   CharacterEditor,
   CharacterMeasurementId,
   CharacterProfile,
-  CharacterWardrobe,
 } from "@/features/characters";
 import CharacterScene from "@/features/characters/scene/CharacterScene";
 import {
-  EXPERIENCE_LEVELS,
-  GoalId,
-  GOALS,
-  METRICS,
-  MetricDefinition,
   MUSCLE_GROUPS,
-  MetricId,
   MuscleGroupId,
   MusclePriority,
   PhysiqueResult,
@@ -36,7 +27,6 @@ import {
   getMuscleDefinition,
 } from "@/lib/simulation";
 import { MuscleMap } from "../muscles/MuscleMap";
-import { MetricCard } from "./MetricCard";
 
 type LabScreenProps = {
   program: TrainingProgram;
@@ -49,16 +39,11 @@ type LabScreenProps = {
   onResetProgram: () => void;
   characterEditorOpen: boolean;
   onCharacterEditorOpenChange: (open: boolean) => void;
-  onNameChange: (name: string) => void;
   onMeasurementChange: (id: CharacterMeasurementId, value: number) => void;
   onBodyTypeChange: (bodyType: CharacterBodyType) => void;
   onAppearanceChange: <K extends keyof CharacterAppearance>(
     id: K,
     value: CharacterAppearance[K],
-  ) => void;
-  onWardrobeChange: <K extends keyof CharacterWardrobe>(
-    id: K,
-    value: CharacterWardrobe[K],
   ) => void;
   onResetCharacter: () => void;
 };
@@ -69,45 +54,6 @@ const PRIORITIES: Array<{ id: MusclePriority; label: string }> = [
   { id: 3, label: "Focus" },
 ];
 
-const INPUT_GROUPS: Array<{
-  id: MetricDefinition["group"];
-  step: string;
-  title: string;
-  description: string;
-}> = [
-  {
-    id: "training",
-    step: "01",
-    title: "How you train",
-    description: "Use the effort and consistency you can repeat in a normal week.",
-  },
-  {
-    id: "recovery",
-    step: "02",
-    title: "Recovery & nutrition",
-    description: "Describe the habits that support the work you do in the gym.",
-  },
-  {
-    id: "startingPoint",
-    step: "03",
-    title: "Starting point & timeline",
-    description: "Give the model enough context to illustrate your direction.",
-  },
-];
-
-const getCalorieGuide = (goal: GoalId) => {
-  if (goal === "build") {
-    return "For Build muscle, a small positive number matches the selected goal.";
-  }
-  if (goal === "cut") {
-    return "For Reduce body fat, a moderate negative number matches the selected goal.";
-  }
-  if (goal === "strength") {
-    return "For Get stronger, maintenance or a small positive number is a simple starting point.";
-  }
-  return "For Recompose, staying close to maintenance matches the selected goal.";
-};
-
 export function LabScreen({
   program,
   result,
@@ -117,63 +63,15 @@ export function LabScreen({
   onResetProgram,
   characterEditorOpen,
   onCharacterEditorOpenChange,
-  onNameChange,
   onMeasurementChange,
   onBodyTypeChange,
   onAppearanceChange,
-  onWardrobeChange,
   onResetCharacter,
 }: LabScreenProps) {
-  const [activeMetric, setActiveMetric] =
-    useState<MetricId>("proteinPerKg");
   const [activeMuscle, setActiveMuscle] =
     useState<MuscleGroupId>("chest");
   const selectedMuscle = program.muscles[activeMuscle];
   const selectedMuscleDefinition = getMuscleDefinition(activeMuscle);
-
-  const describeMetricInPlainLanguage = (
-    metric: MetricDefinition,
-    value: number,
-  ) => {
-    switch (metric.id) {
-      case "proteinPerKg":
-        return `About ${Math.round(
-          value * profile.measurements.weightKg,
-        )} g per day at your saved ${profile.measurements.weightKg} kg body weight.`;
-      case "rir":
-        return value === 0
-          ? "You stop when another clean rep is not possible."
-          : `You stop when you could still do about ${value} more clean ${
-              value === 1 ? "rep" : "reps"
-            }.`;
-      case "weeks": {
-        const months = value / 4.3;
-        return `${value} weeks is about ${
-          months < 2 ? months.toFixed(1) : Math.round(months)
-        } months.`;
-      }
-      case "bodyFat":
-        return `${value}% is used only to adjust the model's visual definition.`;
-      case "sleepHours":
-        return `${value.toFixed(1).replace(".0", "")} hours on an average night.`;
-      case "adherence":
-        return `About ${Math.round(value / 10)} of every 10 planned workouts completed.`;
-      case "calorieBalance":
-        return value === 0
-          ? "You eat about the amount that keeps your weight stable."
-          : `About ${Math.abs(value)} calories ${
-              value < 0 ? "below" : "above"
-            } maintenance each day.`;
-    }
-  };
-
-  const changeMetric = (id: MetricId, value: number) => {
-    onProgramChange((current) => ({
-      ...current,
-      values: { ...current.values, [id]: value },
-    }));
-    setActiveMetric(id);
-  };
 
   const changeMuscleSets = (sets: number) => {
     onProgramChange((current) => ({
@@ -205,11 +103,10 @@ export function LabScreen({
     <div className="lab-screen screen-enter">
       <header className="screen-heading lab-heading">
         <div>
-          <span className="eyebrow">Training response studio</span>
+          <span className="eyebrow">Anatomy studio</span>
           <h1>Physique Lab</h1>
           <p>
-            Shape your training inputs and give individual muscle groups
-            focused attention.
+            Inspect the realistic body model and tune individual muscle groups.
           </p>
         </div>
         <div className="lab-heading-actions">
@@ -217,8 +114,8 @@ export function LabScreen({
             type="button"
             className="icon-button"
             onClick={onResetProgram}
-            aria-label="Reset training program"
-            title="Reset training program"
+            aria-label="Reset muscle settings"
+            title="Reset muscle settings"
           >
             <RotateCcw size={17} />
           </button>
@@ -249,11 +146,9 @@ export function LabScreen({
             profile={profile}
             open={characterEditorOpen}
             onOpenChange={onCharacterEditorOpenChange}
-            onNameChange={onNameChange}
             onMeasurementChange={onMeasurementChange}
             onBodyTypeChange={onBodyTypeChange}
             onAppearanceChange={onAppearanceChange}
-            onWardrobeChange={onWardrobeChange}
             onReset={onResetCharacter}
           />
           <div className="lab-stage-score">
@@ -273,146 +168,16 @@ export function LabScreen({
             </span>
           </div>
         </article>
-
-        <div className="lab-control-column">
-          <article className="program-profile-card">
-            <header>
-              <span className="card-kicker">
-                <Target size={14} />
-                Training program
-              </span>
-              <span className="illustrative-badge">
-                <Info size={12} />
-                Illustrative
-              </span>
-            </header>
-            <div className="profile-select-grid">
-              <label>
-                <span>Program name</span>
-                <input
-                  type="text"
-                  value={program.name}
-                  maxLength={32}
-                  onChange={(event) =>
-                    onProgramChange((current) => ({
-                      ...current,
-                      name: event.target.value,
-                    }))
-                  }
-                />
-              </label>
-              <label>
-                <span>Primary goal</span>
-                <select
-                  value={program.goal}
-                  onChange={(event) =>
-                    onProgramChange((current) => ({
-                      ...current,
-                      goal: event.target.value as TrainingProgram["goal"],
-                    }))
-                  }
-                >
-                  {GOALS.map((goal) => (
-                    <option key={goal.id} value={goal.id}>
-                      {goal.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-              <label>
-                <span>Training experience</span>
-                <select
-                  value={program.experience}
-                  onChange={(event) =>
-                    onProgramChange((current) => ({
-                      ...current,
-                      experience:
-                        event.target.value as TrainingProgram["experience"],
-                    }))
-                  }
-                >
-                  {EXPERIENCE_LEVELS.map((level) => (
-                    <option key={level.id} value={level.id}>
-                      {level.label}
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-            <div className="program-insight">
-              <Sparkles size={15} />
-              <p>
-                <strong>{result.status}</strong>
-                <span>{result.guidance}</span>
-              </p>
-            </div>
-          </article>
-
-          <section
-            className="input-workbench"
-            aria-labelledby="guided-inputs-title"
-          >
-            <header className="input-workbench__header">
-              <div>
-                <span className="eyebrow">Guided inputs</span>
-                <h2 id="guided-inputs-title">Tell us about your routine</h2>
-                <p>
-                  Answer in everyday terms. Each control translates your choice
-                  before it changes the model.
-                </p>
-              </div>
-              <span className="input-count">7 explained inputs</span>
-            </header>
-
-            <div className="input-group-list">
-              {INPUT_GROUPS.map((group) => (
-                <section className="input-group" key={group.id}>
-                  <header className="input-group__header">
-                    <span>{group.step}</span>
-                    <div>
-                      <h3>{group.title}</h3>
-                      <p>{group.description}</p>
-                    </div>
-                  </header>
-                  <div className="metric-grid">
-                    {METRICS.filter((metric) => metric.group === group.id).map(
-                      (metric) => (
-                        <MetricCard
-                          key={metric.id}
-                          metric={metric}
-                          value={program.values[metric.id]}
-                          isActive={activeMetric === metric.id}
-                          plainLanguage={describeMetricInPlainLanguage(
-                            metric,
-                            program.values[metric.id],
-                          )}
-                          recommendation={
-                            metric.id === "calorieBalance"
-                              ? getCalorieGuide(program.goal)
-                              : undefined
-                          }
-                          onChange={changeMetric}
-                          onActivate={setActiveMetric}
-                        />
-                      ),
-                    )}
-                  </div>
-                </section>
-              ))}
-            </div>
-          </section>
-        </div>
       </section>
 
       <section className="muscle-studio panel-card">
         <header className="panel-card__header muscle-studio__header">
           <div>
-            <span className="eyebrow">Per-muscle programming</span>
-            <h2>Choose what the plan emphasizes</h2>
+            <span className="eyebrow">Per-muscle controls</span>
+            <h2>Choose which muscles grow</h2>
           </div>
           <p>
-            Weekly sets are tracked per muscle. High-volume areas also add
-            more recovery demand.
+            Set a training emphasis for each area and see the model respond.
           </p>
         </header>
 
@@ -436,7 +201,7 @@ export function LabScreen({
             <label className="muscle-set-control">
               <span>
                 <b>Weekly working sets</b>
-                <small>0–30 sets per week</small>
+                <small>0-30 sets per week</small>
               </span>
               <input
                 type="range"
@@ -444,7 +209,9 @@ export function LabScreen({
                 max="30"
                 step="1"
                 value={selectedMuscle.sets}
-                onChange={(event) => changeMuscleSets(Number(event.target.value))}
+                onChange={(event) =>
+                  changeMuscleSets(Number(event.target.value))
+                }
               />
               <span className="muscle-set-scale" aria-hidden="true">
                 <i style={{ width: `${(selectedMuscle.sets / 30) * 100}%` }} />
@@ -452,7 +219,7 @@ export function LabScreen({
             </label>
 
             <fieldset className="priority-control">
-              <legend>Programming priority</legend>
+              <legend>Growth priority</legend>
               <div>
                 {PRIORITIES.map((priority) => (
                   <button
@@ -476,9 +243,9 @@ export function LabScreen({
               <BarChart3 size={16} />
               <p>
                 {selectedMuscle.sets < 6
-                  ? "A low-volume maintenance signal for this program."
+                  ? "A low-volume maintenance signal for this muscle."
                   : selectedMuscle.sets <= 18
-                    ? "A productive range with room to adjust from feedback."
+                    ? "A productive growth range with room to adjust."
                     : "Higher volume adds diminishing returns and recovery cost."}
               </p>
             </div>
@@ -511,7 +278,6 @@ export function LabScreen({
           </div>
         </div>
       </section>
-
     </div>
   );
 }

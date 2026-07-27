@@ -302,6 +302,14 @@ select:focus-visible,
   -webkit-backdrop-filter: blur(22px);
 }
 
+.app-section-label {
+  color: var(--muted);
+  font-size: 10px;
+  font-weight: 700;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+}
+
 .app-search {
   display: flex;
   width: min(390px, 42vw);
@@ -969,14 +977,14 @@ select:focus-visible,
 
 .lab-workspace {
   display: grid;
-  grid-template-columns: minmax(360px, 0.88fr) minmax(520px, 1.35fr);
+  grid-template-columns: minmax(0, 1fr);
   gap: 16px;
 }
 
 .lab-stage-card {
   position: relative;
   min-width: 0;
-  min-height: 632px;
+  min-height: 720px;
   overflow: hidden;
   border: 1px solid rgba(226, 224, 233, 0.98);
   border-radius: 27px;
@@ -3058,7 +3066,7 @@ select:focus-visible,
   }
 
   .lab-workspace {
-    grid-template-columns: minmax(330px, 0.85fr) minmax(430px, 1.15fr);
+    grid-template-columns: minmax(0, 1fr);
   }
 
   .metric-card {

@@ -13,7 +13,6 @@ import {
   AnatomyUniforms,
   RealisticBody,
 } from "./RealisticMaleBody";
-import { CharacterLayers } from "./CharacterLayers";
 
 export type CharacterModelProps = CharacterVisualization & {
   profile: CharacterProfile;
@@ -184,10 +183,6 @@ export function CharacterModel({
             appearance={profile.appearance}
             bodyType={profile.bodyType}
             anatomy={anatomy}
-          />
-          <CharacterLayers
-            profile={profile}
-            morphology={morphology}
           />
         </group>
       </group>
