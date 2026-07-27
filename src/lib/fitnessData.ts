@@ -1,6 +1,7 @@
 import {
   createDefaultTrainingProgram,
   MUSCLE_GROUPS,
+  MuscleGroupId,
   TrainingProgram,
 } from "./simulation";
 
@@ -153,6 +154,17 @@ function normalizeTrainingProgram(
     };
     return normalized;
   }, { ...fallback.muscles });
+  const legacyTarget = (
+    partial as Partial<TrainingProgram> & { targetMuscle?: unknown }
+  ).targetMuscle;
+  const isMuscleGroupId = (value: unknown): value is MuscleGroupId =>
+    typeof value === "string" &&
+    MUSCLE_GROUPS.some((muscle) => muscle.id === value);
+  const targetMuscles = Array.isArray(partial.targetMuscles)
+    ? [...new Set(partial.targetMuscles.filter(isMuscleGroupId))]
+    : isMuscleGroupId(legacyTarget)
+      ? [legacyTarget]
+      : fallback.targetMuscles;
 
   return {
     ...fallback,
@@ -162,6 +174,7 @@ function normalizeTrainingProgram(
       typeof partial.name === "string" && partial.name.trim()
         ? partial.name
         : fallback.name,
+    targetMuscles,
     values,
     muscles,
   };

@@ -75,16 +75,16 @@ function injectFemaleAnatomyShader(
         // Female-specific hypertrophy favors glutes and legs, with a softer
         // upper-body response and a narrower transition through the waist.
         float muscleExpansion =
-          uChest * chestMask * 0.044 +
-          uBack * backMask * 0.052 +
-          uShoulders * shoulderMask * 0.043 +
-          uBiceps * bicepsMask * 0.038 +
-          uTriceps * tricepsMask * 0.038 +
-          uCore * coreMask * 0.025 +
-          uGlutes * gluteMask * 0.092 +
-          uQuads * quadMask * 0.075 +
-          uHamstrings * hamstringMask * 0.08 +
-          uCalves * calfMask * 0.048;
+          uChest * chestMask * 0.062 +
+          uBack * backMask * 0.07 +
+          uShoulders * shoulderMask * 0.038 +
+          uBiceps * bicepsMask * 0.017 +
+          uTriceps * tricepsMask * 0.017 +
+          uCore * coreMask * 0.035 +
+          uGlutes * gluteMask * 0.105 +
+          uQuads * quadMask * 0.09 +
+          uHamstrings * hamstringMask * 0.09 +
+          uCalves * calfMask * 0.032;
 
         float trunkEnvelope = femaleBand(position.y, -0.72, 1.24, 0.46) *
           (1.0 - smoothstep(0.66, 0.93, ax));
@@ -120,6 +120,21 @@ function injectFemaleAnatomyShader(
         transformed += objectNormal * (
           muscleExpansion * uGrowth * 1.8 * muscleVisibility +
           fatExpansion * uFat
+        );
+        float regionalGrowth = uGrowth * muscleVisibility;
+        transformed.x *= 1.0 + regionalGrowth * (
+          uShoulders * shoulderMask * 0.025 +
+          uGlutes * gluteMask * 0.035 +
+          uQuads * quadMask * 0.03 +
+          uHamstrings * hamstringMask * 0.025
+        );
+        transformed.z *= 1.0 + regionalGrowth * (
+          uChest * chestMask * 0.04 +
+          uBack * backMask * 0.02 +
+          uCore * coreMask * 0.014 +
+          uGlutes * gluteMask * 0.065 +
+          uQuads * quadMask * 0.02 +
+          uHamstrings * hamstringMask * 0.02
         );
 
         float hipScale = femaleBand(position.y, -0.9, 0.08, 0.38) *
@@ -248,7 +263,7 @@ function injectFemaleAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-female-anatomy-v1";
+  material.customProgramCacheKey = () => "realistic-female-anatomy-v2";
 }
 
 function createFemaleSkinMaterial(

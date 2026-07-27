@@ -59,6 +59,7 @@ export type TrainingProgram = {
   daysPerWeek: number;
   sessionMinutes: number;
   equipment: EquipmentId;
+  targetMuscles: MuscleGroupId[];
   values: SimulationValues;
   muscles: MuscleSettings;
 };
@@ -355,6 +356,27 @@ export const MUSCLE_GROUPS: MuscleDefinition[] = [
   { id: "calves", label: "Calves", shortLabel: "Calves", color: "#559e7b" },
 ];
 
+export const MUSCLE_TARGETS: Array<{
+  id: MuscleGroupId;
+  label: string;
+}> = MUSCLE_GROUPS.map(({ id, label }) => ({ id, label }));
+
+const TARGET_SYNERGIES: Record<
+  MuscleGroupId,
+  Partial<Record<MuscleGroupId, number>>
+> = {
+  chest: { shoulders: 0.3, triceps: 0.35 },
+  back: { shoulders: 0.25, biceps: 0.4 },
+  shoulders: { chest: 0.15, back: 0.15, triceps: 0.3 },
+  biceps: { back: 0.25 },
+  triceps: { chest: 0.22, shoulders: 0.22 },
+  core: { back: 0.1 },
+  quads: { glutes: 0.3, calves: 0.12 },
+  hamstrings: { glutes: 0.4, calves: 0.12 },
+  glutes: { hamstrings: 0.35, quads: 0.2 },
+  calves: {},
+};
+
 export const INITIAL_VALUES = METRICS.reduce(
   (values, metric) => ({ ...values, [metric.id]: metric.initial }),
   {} as SimulationValues,
@@ -381,6 +403,7 @@ export function createDefaultTrainingProgram(): TrainingProgram {
     daysPerWeek: 3,
     sessionMinutes: 60,
     equipment: EQUIPMENT_OPTIONS[0].id,
+    targetMuscles: [],
     values: { ...INITIAL_VALUES },
     muscles: createMuscleSettings(),
   };
@@ -463,8 +486,8 @@ export function derivePhysique(
   );
 
   // Visual growth is normalized to the person's frame and used exactly once
-  // by the anatomy shader. Regional signals stay at one because this MVP uses
-  // a balanced whole-body training dose rather than hidden muscle settings.
+  // by the anatomy shader. A selected target receives the full dose, while
+  // anatomically related muscles receive a smaller compound-training signal.
   const growth = clamp(
     estimatedLeanGainKg /
       Math.max(1.1, measurements.weightKg * 0.025),
@@ -473,8 +496,22 @@ export function derivePhysique(
   const balance = recoveryCapacity;
   const readiness = Math.round(recoveryCapacity * 100);
   const adaptation = Math.round(growth * 100);
+  const balancedTargeting =
+    program.targetMuscles.length === 0 ||
+    program.targetMuscles.length === MUSCLE_GROUPS.length;
   const muscleSignals = MUSCLE_GROUPS.reduce((signals, muscle) => {
-    signals[muscle.id] = 1;
+    if (balancedTargeting) {
+      signals[muscle.id] = 1;
+      return signals;
+    }
+
+    signals[muscle.id] = Math.max(
+      ...program.targetMuscles.map((target) =>
+        muscle.id === target
+          ? 1
+          : TARGET_SYNERGIES[target][muscle.id] ?? 0.06,
+      ),
+    );
     return signals;
   }, {} as Record<MuscleGroupId, number>);
 

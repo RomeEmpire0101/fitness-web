@@ -93,16 +93,16 @@ function injectAnatomyShader(
           legZone;
 
         float expansion =
-          uChest * chestMask * 0.072 +
-          uBack * backMask * 0.065 +
-          uShoulders * shoulderMask * 0.068 +
-          uBiceps * bicepsMask * 0.055 +
-          uTriceps * tricepsMask * 0.052 +
-          uCore * coreMask * 0.032 +
-          uGlutes * gluteMask * 0.06 +
-          uQuads * quadMask * 0.06 +
-          uHamstrings * hamstringMask * 0.057 +
-          uCalves * calfMask * 0.052;
+          uChest * chestMask * 0.09 +
+          uBack * backMask * 0.085 +
+          uShoulders * shoulderMask * 0.05 +
+          uBiceps * bicepsMask * 0.022 +
+          uTriceps * tricepsMask * 0.021 +
+          uCore * coreMask * 0.045 +
+          uGlutes * gluteMask * 0.09 +
+          uQuads * quadMask * 0.082 +
+          uHamstrings * hamstringMask * 0.078 +
+          uCalves * calfMask * 0.035;
 
         // Broad overlapping envelopes produce a continuous subcutaneous layer.
         // Regional masks then bias where volume accumulates without creating
@@ -189,6 +189,22 @@ function injectAnatomyShader(
         transformed += objectNormal * (
           expansion * uGrowth * 1.55 * muscleVisibility +
           fatExpansion * uFat
+        );
+        float regionalGrowth = uGrowth * muscleVisibility;
+        transformed.x *= 1.0 + regionalGrowth * (
+          uBack * backMask * 0.025 +
+          uShoulders * shoulderMask * 0.035 +
+          uGlutes * gluteMask * 0.025 +
+          uQuads * quadMask * 0.025 +
+          uHamstrings * hamstringMask * 0.02
+        );
+        transformed.z *= 1.0 + regionalGrowth * (
+          uChest * chestMask * 0.05 +
+          uBack * backMask * 0.025 +
+          uCore * coreMask * 0.018 +
+          uGlutes * gluteMask * 0.055 +
+          uQuads * quadMask * 0.018 +
+          uHamstrings * hamstringMask * 0.02
         );
 
         float maleCentralScale = anatomyBand(
@@ -304,7 +320,7 @@ function injectAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-male-anatomy-v12";
+  material.customProgramCacheKey = () => "realistic-male-anatomy-v13";
 }
 
 function createSkinMaterial(

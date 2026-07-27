@@ -1018,7 +1018,7 @@ select:focus-visible,
 .lab-character {
   position: absolute;
   z-index: 2;
-  inset: 94px 18% 100px;
+  inset: 94px 18% 34px;
   cursor: grab;
 }
 
@@ -1125,6 +1125,29 @@ select:focus-visible,
   white-space: nowrap;
 }
 
+.input-variable-pill__effort {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 7px;
+}
+
+.input-variable-pill__effort b {
+  overflow: hidden;
+  color: #202126;
+  font: 750 14px/1.1 var(--font-ui);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.input-variable-pill__effort small {
+  color: #777980;
+  font-size: 7px;
+  font-weight: 650;
+  white-space: nowrap;
+}
+
 .input-variable-pill__range {
   width: 100%;
   height: 14px;
@@ -1206,77 +1229,87 @@ select:focus-visible,
   box-shadow: 0 4px 11px rgba(35, 36, 41, 0.17);
 }
 
-.projection-summary {
+.muscle-target-selector {
   position: absolute;
-  z-index: 11;
-  bottom: 15px;
-  left: 50%;
-  display: grid;
-  min-width: 320px;
-  justify-items: center;
-  padding: 11px 16px 10px;
+  z-index: 14;
+  bottom: 18px;
+  left: 18px;
+}
+
+.muscle-target-selector__trigger {
+  display: flex;
+  min-height: 36px;
+  align-items: center;
+  gap: 7px;
+  padding: 0 10px;
   border: 1px solid rgba(35, 37, 42, 0.11);
-  border-radius: 20px;
+  border-radius: 999px;
   color: #25262b;
   background: rgba(255, 255, 255, 0.86);
   box-shadow:
     inset 0 1px 0 rgba(255, 255, 255, 0.96),
-    0 10px 25px rgba(42, 40, 55, 0.08);
+    0 8px 20px rgba(42, 40, 55, 0.08);
   backdrop-filter: blur(16px);
   -webkit-backdrop-filter: blur(16px);
-  transform: translateX(-50%);
+  cursor: pointer;
 }
 
-.projection-summary > span {
-  color: #6d6f76;
+.muscle-target-selector__trigger span {
+  color: #777980;
   font-size: 7px;
   font-weight: 750;
-  letter-spacing: 0.08em;
+  letter-spacing: 0.07em;
   text-transform: uppercase;
 }
 
-.projection-summary > strong {
-  margin-top: 2px;
-  font: 650 19px/1.05 var(--font-display);
-  letter-spacing: -0.04em;
+.muscle-target-selector__trigger b {
+  min-width: 54px;
+  font: 750 9px/1 var(--font-ui);
+  text-align: left;
 }
 
-.projection-summary > small {
-  margin-top: 2px;
-  color: #888a91;
-  font-size: 7px;
+.muscle-target-selector.is-open .muscle-target-selector__trigger svg:last-child {
+  transform: rotate(180deg);
 }
 
-.projection-summary > div {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding-top: 8px;
-  margin-top: 8px;
-  border-top: 1px solid rgba(35, 37, 42, 0.08);
-}
-
-.projection-summary > div > span {
+.muscle-target-selector__menu {
+  position: absolute;
+  bottom: calc(100% + 8px);
+  left: 0;
   display: grid;
-  min-width: 78px;
-  justify-items: center;
-  gap: 1px;
+  width: min(306px, calc(100vw - 56px));
+  box-sizing: border-box;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 4px;
+  padding: 7px;
+  border: 1px solid rgba(35, 37, 42, 0.12);
+  border-radius: 17px;
+  background: rgba(250, 250, 252, 0.94);
+  box-shadow: 0 14px 34px rgba(36, 37, 42, 0.14);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
 }
 
-.projection-summary b {
-  font-size: 9px;
-  white-space: nowrap;
+.muscle-target-selector__menu button {
+  min-height: 30px;
+  padding: 0 7px;
+  border: 0;
+  border-radius: 10px;
+  color: #64666d;
+  background: transparent;
+  font: 700 8px/1 var(--font-ui);
+  cursor: pointer;
+  text-align: left;
 }
 
-.projection-summary small {
-  color: #8a8c93;
-  font-size: 6px;
+.muscle-target-selector__menu button:hover {
+  color: #24252a;
+  background: rgba(37, 38, 43, 0.06);
 }
 
-.projection-summary i {
-  color: #9799a0;
-  font-size: 10px;
-  font-style: normal;
+.muscle-target-selector__menu button.is-active {
+  color: #fff;
+  background: #28292e;
 }
 
 .lab-stage-score {
@@ -3498,11 +3531,11 @@ select:focus-visible,
   }
 
   .lab-stage-card {
-    min-height: 980px;
+    min-height: 900px;
   }
 
   .lab-character {
-    inset: 392px 2% 112px;
+    inset: 392px 2% 48px;
   }
 
   .lab-input-variables {
@@ -3533,8 +3566,13 @@ select:focus-visible,
     top: 350px;
   }
 
-  .projection-summary {
-    min-width: min(320px, calc(100% - 32px));
+  .muscle-target-selector {
+    bottom: 12px;
+    left: 12px;
+  }
+
+  .muscle-target-selector__menu {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
   }
 
   .lab-stage-score {
