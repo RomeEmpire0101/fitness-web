@@ -1,7 +1,14 @@
 "use client";
 
 import { Activity } from "lucide-react";
-import { CSSProperties } from "react";
+import {
+  ChangeEvent,
+  CSSProperties,
+  KeyboardEvent,
+  useEffect,
+  useRef,
+  useState,
+} from "react";
 import {
   CharacterAppearance,
   CharacterBodyType,
@@ -12,6 +19,7 @@ import {
 import CharacterScene from "@/features/characters/scene/CharacterScene";
 import {
   METRICS,
+  MetricDefinition,
   MetricId,
   PhysiqueResult,
   TrainingProgram,
@@ -22,6 +30,9 @@ type LabScreenProps = {
   result: PhysiqueResult;
   profile: CharacterProfile;
   reducedMotion: boolean;
+  onProgramChange: (
+    update: (program: TrainingProgram) => TrainingProgram,
+  ) => void;
   characterEditorOpen: boolean;
   onCharacterEditorOpenChange: (open: boolean) => void;
   onMeasurementChange: (id: CharacterMeasurementId, value: number) => void;
@@ -33,41 +44,132 @@ type LabScreenProps = {
   onResetCharacter: () => void;
 };
 
-const INPUT_LABELS: Record<MetricId, string> = {
+const INPUT_LABELS: Partial<Record<MetricId, string>> = {
   proteinPerKg: "Protein",
-  rir: "RIR",
-  weeks: "Weeks",
-  bodyFat: "Body fat",
+  rir: "Reps left",
   sleepHours: "Sleep",
   adherence: "Consistency",
-  calorieBalance: "Calories",
 };
 
-const formatMetricValue = (
-  id: MetricId,
+const INPUT_METRIC_IDS = [
+  "proteinPerKg",
+  "rir",
+  "sleepHours",
+  "adherence",
+] as const satisfies readonly MetricId[];
+
+const INPUT_METRICS = INPUT_METRIC_IDS.map(
+  (id) => METRICS.find((metric) => metric.id === id)!,
+);
+
+type InputVariableControlProps = {
+  metric: MetricDefinition;
   value: number,
-  shortUnit: string,
-) => {
-  if (id === "calorieBalance") {
-    return `${value > 0 ? "+" : ""}${value} ${shortUnit}`;
-  }
-
-  if (id === "sleepHours") {
-    return `${value.toFixed(1).replace(".0", "")} h`;
-  }
-
-  if (id === "bodyFat" || id === "adherence") {
-    return `${value}%`;
-  }
-
-  return `${value} ${shortUnit}`;
+  onChange: (id: MetricId, value: number) => void;
 };
+
+function InputVariableControl({
+  metric,
+  value,
+  onChange,
+}: InputVariableControlProps) {
+  const precision = metric.step < 1 ? 1 : 0;
+  const formatValue = (next: number) => next.toFixed(precision);
+  const [draft, setDraft] = useState(formatValue(value));
+  const editing = useRef(false);
+  const progress =
+    ((value - metric.min) / (metric.max - metric.min)) * 100;
+
+  useEffect(() => {
+    if (!editing.current) setDraft(value.toFixed(precision));
+  }, [precision, value]);
+
+  const updateNumber = (event: ChangeEvent<HTMLInputElement>) => {
+    const raw = event.target.value;
+    const next = Number(raw);
+    setDraft(raw);
+
+    if (
+      raw !== "" &&
+      Number.isFinite(next) &&
+      next >= metric.min &&
+      next <= metric.max
+    ) {
+      onChange(metric.id, next);
+    }
+  };
+
+  const commitNumber = () => {
+    editing.current = false;
+    const parsed = Number(draft);
+    const stepped = Number.isFinite(parsed)
+      ? Math.round(parsed / metric.step) * metric.step
+      : value;
+    const next = Math.min(metric.max, Math.max(metric.min, stepped));
+    onChange(metric.id, next);
+    setDraft(formatValue(next));
+  };
+
+  const updateRange = (event: ChangeEvent<HTMLInputElement>) => {
+    const next = Number(event.target.value);
+    setDraft(formatValue(next));
+    onChange(metric.id, next);
+  };
+
+  const handleNumberKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") event.currentTarget.blur();
+  };
+
+  return (
+    <div
+      className={`input-variable-pill input-variable-pill--${metric.id}`}
+      style={
+        {
+          "--input-progress": `${progress}%`,
+        } as CSSProperties
+      }
+      role="group"
+      aria-label={metric.label}
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <span>{INPUT_LABELS[metric.id]}</span>
+      <span className="input-variable-pill__number">
+        <input
+          type="number"
+          min={metric.min}
+          max={metric.max}
+          step={metric.step}
+          value={draft}
+          onFocus={() => {
+            editing.current = true;
+          }}
+          onChange={updateNumber}
+          onBlur={commitNumber}
+          onKeyDown={handleNumberKey}
+          aria-label={metric.label}
+        />
+        <b>{metric.shortUnit}</b>
+      </span>
+      <input
+        className="input-variable-pill__range"
+        type="range"
+        min={metric.min}
+        max={metric.max}
+        step={metric.step}
+        value={value}
+        onChange={updateRange}
+        aria-label={`Adjust ${metric.label}`}
+      />
+    </div>
+  );
+}
 
 export function LabScreen({
   program,
   result,
   profile,
   reducedMotion,
+  onProgramChange,
   characterEditorOpen,
   onCharacterEditorOpenChange,
   onMeasurementChange,
@@ -75,6 +177,16 @@ export function LabScreen({
   onAppearanceChange,
   onResetCharacter,
 }: LabScreenProps) {
+  const changeMetric = (id: MetricId, value: number) => {
+    onProgramChange((current) => ({
+      ...current,
+      values: {
+        ...current.values,
+        [id]: value,
+      },
+    }));
+  };
+
   return (
     <div className="lab-screen screen-enter">
       <header className="screen-heading lab-heading">
@@ -123,25 +235,13 @@ export function LabScreen({
           >
             <h2 id="input-variables-title">Input variables</h2>
             <div>
-              {METRICS.map((metric) => (
-                <span
-                  className="input-variable-pill"
+              {INPUT_METRICS.map((metric) => (
+                <InputVariableControl
                   key={metric.id}
-                  style={
-                    {
-                      "--pill-accent": metric.accent,
-                    } as CSSProperties
-                  }
-                >
-                  <span>{INPUT_LABELS[metric.id]}</span>
-                  <strong>
-                    {formatMetricValue(
-                      metric.id,
-                      program.values[metric.id],
-                      metric.shortUnit,
-                    )}
-                  </strong>
-                </span>
+                  metric={metric}
+                  value={program.values[metric.id]}
+                  onChange={changeMetric}
+                />
               ))}
             </div>
           </section>

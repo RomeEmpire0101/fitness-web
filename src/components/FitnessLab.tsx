@@ -10,12 +10,12 @@ import { useMemo, useState } from "react";
 import { useCharacterProfile } from "@/features/characters";
 import { useFitnessData } from "@/hooks/useFitnessData";
 import { useReducedMotion } from "@/hooks/useReducedMotion";
-import { derivePhysique } from "@/lib/simulation";
+import { derivePhysique, TrainingProgram } from "@/lib/simulation";
 import { LabScreen } from "./lab/LabScreen";
 
 export function FitnessLab() {
   const [mobileNavigationOpen, setMobileNavigationOpen] = useState(false);
-  const [fitnessData] = useFitnessData();
+  const [fitnessData, setFitnessData] = useFitnessData();
   const { program } = fitnessData;
   const [characterEditorOpen, setCharacterEditorOpen] = useState(false);
   const reducedMotion = useReducedMotion();
@@ -28,6 +28,15 @@ export function FitnessLab() {
   } = useCharacterProfile();
 
   const result = useMemo(() => derivePhysique(program), [program]);
+
+  const updateProgram = (
+    update: (program: TrainingProgram) => TrainingProgram,
+  ) => {
+    setFitnessData((current) => ({
+      ...current,
+      program: update(current.program),
+    }));
+  };
 
   return (
     <div className="fitness-app">
@@ -97,6 +106,7 @@ export function FitnessLab() {
             result={result}
             profile={profile}
             reducedMotion={reducedMotion}
+            onProgramChange={updateProgram}
             characterEditorOpen={characterEditorOpen}
             onCharacterEditorOpenChange={setCharacterEditorOpen}
             onMeasurementChange={updateMeasurement}

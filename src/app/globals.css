@@ -1018,7 +1018,7 @@ select:focus-visible,
 .lab-character {
   position: absolute;
   z-index: 2;
-  inset: 16px 2% 104px;
+  inset: 72px 4% 18px;
   cursor: grab;
 }
 
@@ -1029,58 +1029,147 @@ select:focus-visible,
 .lab-input-variables {
   position: absolute;
   z-index: 10;
-  right: 16px;
-  bottom: 16px;
-  left: 16px;
+  inset: 52px 22px 22px;
+  pointer-events: none;
 }
 
 .lab-input-variables h2 {
-  margin: 0 0 8px;
-  color: #6f717b;
+  position: absolute;
+  top: 0;
+  left: 50%;
+  margin: 0;
+  color: #5f6168;
   font: 750 8px/1 var(--font-ui);
   letter-spacing: 0.14em;
+  transform: translateX(-50%);
   text-transform: uppercase;
 }
 
 .lab-input-variables > div {
-  display: flex;
-  flex-wrap: wrap;
-  gap: 6px;
+  position: absolute;
+  inset: 22px 0 0;
 }
 
 .input-variable-pill {
-  display: inline-flex;
-  min-height: 30px;
-  align-items: center;
+  position: absolute;
+  display: grid;
+  width: 174px;
   gap: 7px;
-  padding: 6px 10px;
-  border: 1px solid color-mix(in srgb, var(--pill-accent) 22%, #e1dfe7);
-  border-radius: 999px;
-  background: rgba(255, 255, 255, 0.82);
-  box-shadow: 0 7px 18px rgba(42, 40, 55, 0.06);
+  padding: 10px 12px 9px;
+  border: 1px solid rgba(38, 39, 44, 0.13);
+  border-radius: 20px;
+  color: #25262b;
+  background: rgba(255, 255, 255, 0.86);
+  box-shadow:
+    inset 0 1px 0 rgba(255, 255, 255, 0.95),
+    0 8px 22px rgba(42, 40, 55, 0.07);
   backdrop-filter: blur(14px);
   -webkit-backdrop-filter: blur(14px);
+  pointer-events: auto;
+}
+
+.input-variable-pill--proteinPerKg {
+  top: 0;
+  left: calc(50% - 184px);
+}
+
+.input-variable-pill--rir {
+  top: 0;
+  right: calc(50% - 184px);
+}
+
+.input-variable-pill--sleepHours {
+  top: 42%;
+  left: 0;
+}
+
+.input-variable-pill--adherence {
+  top: 42%;
+  right: 0;
+}
+
+.input-variable-pill > span:first-child {
+  color: #686a71;
+  font-size: 8px;
+  font-weight: 750;
+  letter-spacing: 0.02em;
+}
+
+.input-variable-pill__number {
+  display: flex;
+  min-width: 0;
+  align-items: baseline;
+  gap: 5px;
+}
+
+.input-variable-pill__number input {
+  width: 68px;
+  padding: 1px 2px 2px;
+  border: 0;
+  border-bottom: 1px solid rgba(37, 38, 43, 0.18);
+  outline: 0;
+  color: #202126;
+  background: transparent;
+  font: 750 17px/1.1 var(--font-ui);
+}
+
+.input-variable-pill__number input:focus {
+  border-bottom-color: #202126;
+}
+
+.input-variable-pill__number b {
+  overflow: hidden;
+  color: #777980;
+  font-size: 8px;
+  font-weight: 650;
+  text-overflow: ellipsis;
   white-space: nowrap;
 }
 
-.input-variable-pill::before {
-  width: 5px;
-  height: 5px;
+.input-variable-pill__range {
+  width: 100%;
+  height: 14px;
+  margin: 0;
+  outline: 0;
+  background:
+    linear-gradient(
+      to right,
+      #303137 0 var(--input-progress),
+      #d5d5d9 var(--input-progress) 100%
+    )
+    center / 100% 2px no-repeat;
+  cursor: pointer;
+  appearance: none;
+}
+
+.input-variable-pill__range::-webkit-slider-runnable-track {
+  height: 2px;
+  background: transparent;
+}
+
+.input-variable-pill__range::-moz-range-track {
+  height: 2px;
+  background: transparent;
+}
+
+.input-variable-pill__range::-webkit-slider-thumb {
+  width: 12px;
+  height: 12px;
+  margin-top: -5px;
+  border: 3px solid #fff;
   border-radius: 50%;
-  background: var(--pill-accent);
-  content: "";
+  background: #303137;
+  box-shadow: 0 1px 5px rgba(32, 33, 38, 0.22);
+  appearance: none;
 }
 
-.input-variable-pill span {
-  color: #777983;
-  font-size: 7px;
-  font-weight: 650;
-}
-
-.input-variable-pill strong {
-  color: #2c2d34;
-  font-size: 7px;
-  font-weight: 800;
+.input-variable-pill__range::-moz-range-thumb {
+  width: 7px;
+  height: 7px;
+  border: 3px solid #fff;
+  border-radius: 50%;
+  background: #303137;
+  box-shadow: 0 1px 5px rgba(32, 33, 38, 0.22);
 }
 
 .lab-stage-score {
@@ -3302,7 +3391,33 @@ select:focus-visible,
   }
 
   .lab-stage-card {
-    min-height: 500px;
+    min-height: 620px;
+  }
+
+  .lab-character {
+    inset: 184px 2% 12px;
+  }
+
+  .lab-input-variables {
+    inset: 52px 12px 12px;
+  }
+
+  .lab-input-variables h2 {
+    left: 0;
+    transform: none;
+  }
+
+  .lab-input-variables > div {
+    top: 21px;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 7px;
+    align-content: start;
+  }
+
+  .input-variable-pill {
+    position: static;
+    width: auto;
   }
 
   .lab-stage-score {
