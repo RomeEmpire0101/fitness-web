@@ -18,7 +18,7 @@ export type EquipmentId =
   | "bodyweight";
 
 export type MetricId =
-  | "proteinPerKg"
+  | "proteinGrams"
   | "rir"
   | "weeks"
   | "bodyFat"
@@ -135,28 +135,28 @@ export const EQUIPMENT_OPTIONS: Array<{
 
 export const METRICS: MetricDefinition[] = [
   {
-    id: "proteinPerKg",
+    id: "proteinGrams",
     group: "recovery",
     label: "Protein intake",
     question: "How much protein do you eat each day?",
-    unit: "grams per kilogram of body weight",
-    shortUnit: "g/kg",
-    min: 0.6,
-    max: 2.6,
-    step: 0.1,
-    initial: 1.6,
+    unit: "grams per day",
+    shortUnit: "g",
+    min: 40,
+    max: 250,
+    step: 5,
+    initial: 130,
     accent: "#6f6af8",
-    description: "Use your body weight to make different people comparable.",
-    lowLabel: "Lower protein",
-    highLabel: "Higher protein",
-    recommendation: "The model's well-supported zone is 1.5–2.1 g/kg.",
+    description: "Enter your average total protein intake for one day.",
+    lowLabel: "40 grams",
+    highLabel: "250 grams",
+    recommendation: "Use your typical daily total rather than your best day.",
     Icon: Beef,
     describe: (value) =>
-      value < 1.1
+      value < 75
         ? "May limit recovery"
-        : value < 1.5
+        : value < 110
           ? "Some support"
-          : value <= 2.1
+          : value <= 180
             ? "Supports training"
             : "Above model target",
   },
@@ -379,14 +379,22 @@ const getGoalEnergyTarget = (goal: GoalId) => {
 export function derivePhysique(program: TrainingProgram): PhysiqueResult {
   const { values, muscles } = program;
   const adherence = values.adherence / 100;
-  const proteinSupport = smoothstep(0.65, 1.65, values.proteinPerKg);
+  const proteinSupport = smoothstep(55, 150, values.proteinGrams);
   const sleepSupport = smoothstep(4.5, 8.3, values.sleepHours);
   const effortQuality = clamp(1 - Math.abs(values.rir - 2) * 0.13, 0.5, 1);
   const failureCost = values.rir < 1 ? 0.24 : values.rir < 2 ? 0.08 : 0;
+  const wholeBodyTrainingSignal = clamp(
+    0.62 + (program.daysPerWeek - 2) * 0.07,
+    0.58,
+    0.86,
+  );
 
   const muscleSignals = MUSCLE_GROUPS.reduce((signals, definition) => {
     const setting = muscles[definition.id];
-    const volumeSignal = smoothstep(2, 18, setting.sets);
+    const volumeSignal =
+      setting.sets > 0
+        ? smoothstep(2, 18, setting.sets)
+        : wholeBodyTrainingSignal;
     const priorityBoost = 0.84 + (setting.priority - 1) * 0.08;
     signals[definition.id] = clamp(
       volumeSignal * effortQuality * adherence * priorityBoost,
@@ -395,7 +403,11 @@ export function derivePhysique(program: TrainingProgram): PhysiqueResult {
   }, {} as Record<MuscleGroupId, number>);
 
   const averageSets = average(
-    MUSCLE_GROUPS.map((muscle) => muscles[muscle.id].sets),
+    MUSCLE_GROUPS.map((muscle) =>
+      muscles[muscle.id].sets > 0
+        ? muscles[muscle.id].sets
+        : wholeBodyTrainingSignal * 14,
+    ),
   );
   const volumeSignal = average(Object.values(muscleSignals));
   const excessVolume = average(

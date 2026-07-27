@@ -45,17 +45,17 @@ type LabScreenProps = {
 };
 
 const INPUT_LABELS: Partial<Record<MetricId, string>> = {
-  proteinPerKg: "Protein",
+  proteinGrams: "Protein",
   rir: "Reps left",
   sleepHours: "Sleep",
   adherence: "Consistency",
 };
 
 const INPUT_METRIC_IDS = [
-  "proteinPerKg",
-  "rir",
   "sleepHours",
+  "proteinGrams",
   "adherence",
+  "rir",
 ] as const satisfies readonly MetricId[];
 
 const INPUT_METRICS = INPUT_METRIC_IDS.map(

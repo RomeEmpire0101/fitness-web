@@ -124,10 +124,24 @@ function normalizeTrainingProgram(
   fallback: TrainingProgram,
 ): TrainingProgram {
   const partial = candidate as Partial<TrainingProgram>;
-  const values =
+  const candidateValues =
     partial.values && typeof partial.values === "object"
-      ? { ...fallback.values, ...partial.values }
-      : fallback.values;
+      ? (partial.values as Partial<TrainingProgram["values"]> & {
+          proteinPerKg?: unknown;
+        })
+      : {};
+  const legacyProtein =
+    typeof candidateValues.proteinPerKg === "number"
+      ? Math.round((candidateValues.proteinPerKg * 75) / 5) * 5
+      : fallback.values.proteinGrams;
+  const values = {
+    ...fallback.values,
+    ...candidateValues,
+    proteinGrams:
+      typeof candidateValues.proteinGrams === "number"
+        ? candidateValues.proteinGrams
+        : legacyProtein,
+  };
   const sourceMuscles =
     partial.muscles && typeof partial.muscles === "object"
       ? partial.muscles

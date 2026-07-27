@@ -77,20 +77,20 @@ gltf.scene.traverse((object) => {
 
     const xScale =
       1 -
-      ribcage * 0.028 -
-      shoulders * 0.048 -
-      waist * 0.065 +
-      hips * 0.065 +
-      thighs * 0.025 -
-      arms * 0.022 -
-      neck * 0.035 -
-      jaw * 0.022;
+      ribcage * 0.042 -
+      shoulders * 0.072 -
+      waist * 0.09 +
+      hips * 0.105 +
+      thighs * 0.05 -
+      arms * 0.04 -
+      neck * 0.045 -
+      jaw * 0.032;
     const zScale =
       1 -
-      ribcage * 0.018 +
-      hips * 0.038 +
-      thighs * 0.02 -
-      arms * 0.018;
+      ribcage * 0.025 +
+      hips * 0.06 +
+      thighs * 0.033 -
+      arms * 0.026;
 
     const front = smoothstep(0.035, 0.24, z);
     const rear = smoothstep(0.035, 0.24, -z);
@@ -111,7 +111,7 @@ gltf.scene.traverse((object) => {
       index,
       x * xScale,
       y,
-      z * zScale + breastShape * 0.1 - gluteShape * 0.058,
+      z * zScale + breastShape * 0.125 - gluteShape * 0.08,
     );
   }
 

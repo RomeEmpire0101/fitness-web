@@ -11,8 +11,9 @@ import {
 } from "../types";
 import {
   AnatomyUniforms,
-  RealisticBody,
+  RealisticMaleBody,
 } from "./RealisticMaleBody";
+import { RealisticFemaleBody } from "./RealisticFemaleBody";
 
 export type CharacterModelProps = CharacterVisualization & {
   profile: CharacterProfile;
@@ -179,12 +180,19 @@ export function CharacterModel({
     <group ref={root}>
       <group ref={bodyScale}>
         <group ref={breath}>
-          <RealisticBody
-            key={profile.bodyType}
-            appearance={profile.appearance}
-            bodyType={profile.bodyType}
-            anatomy={anatomy}
-          />
+          {profile.bodyType === "female" ? (
+            <RealisticFemaleBody
+              key="female"
+              appearance={profile.appearance}
+              anatomy={anatomy}
+            />
+          ) : (
+            <RealisticMaleBody
+              key="male"
+              appearance={profile.appearance}
+              anatomy={anatomy}
+            />
+          )}
         </group>
       </group>
     </group>

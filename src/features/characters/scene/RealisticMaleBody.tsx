@@ -3,10 +3,7 @@
 import { useGLTF } from "@react-three/drei";
 import { useEffect, useMemo } from "react";
 import * as THREE from "three";
-import {
-  CharacterAppearance,
-  CharacterBodyType,
-} from "../types";
+import { CharacterAppearance } from "../types";
 
 export type AnatomyUniforms = {
   uGrowth: { value: number };
@@ -28,9 +25,8 @@ export type AnatomyUniforms = {
   uStimulusColor: { value: THREE.Color };
 };
 
-type RealisticBodyProps = {
+type RealisticMaleBodyProps = {
   appearance: CharacterAppearance;
-  bodyType: CharacterBodyType;
   anatomy: AnatomyUniforms;
 };
 
@@ -48,7 +44,6 @@ function injectAnatomyShader(
         uniform float uGrowth;
         uniform float uWidth;
         uniform float uFat;
-        uniform float uFeminine;
         uniform float uChest;
         uniform float uBack;
         uniform float uShoulders;
@@ -185,18 +180,14 @@ function injectAnatomyShader(
           chestAdipose * 0.032 +
           upperBackAdipose * 0.024 +
           lowerBack * 0.03;
-        float fatExpansion = clamp(
-          mix(maleFatExpansion, femaleFatExpansion, uFeminine),
-          0.0,
-          0.2
-        );
+        float fatExpansion = clamp(maleFatExpansion, 0.0, 0.2);
         float muscleVisibility = mix(
           1.0,
           0.58,
           clamp(uFat * 0.78, 0.0, 1.0)
         );
         transformed += objectNormal * (
-          expansion * uGrowth * muscleVisibility +
+          expansion * uGrowth * 1.55 * muscleVisibility +
           fatExpansion * uFat
         );
 
@@ -224,22 +215,11 @@ function injectAnatomyShader(
           -0.08,
           0.42
         ) * legZone;
-        float fatXScale = mix(
+        float fatXScale =
           maleCentralScale * 0.18 -
-            hipEnvelope * 0.1 -
-            thighEnvelope * 0.05,
-          femaleTrunkScale * 0.06 +
-            femaleHipScale * 0.025 +
-            femaleThighScale * 0.014,
-          uFeminine
-        );
-        float fatZScale = mix(
-          maleCentralScale * 0.24,
-          femaleTrunkScale * 0.12 +
-            femaleHipScale * 0.03 +
-            femaleThighScale * 0.01,
-          uFeminine
-        );
+          hipEnvelope * 0.1 -
+          thighEnvelope * 0.05;
+        float fatZScale = maleCentralScale * 0.24;
         transformed.x *= 1.0 + uFat * fatXScale;
         transformed.z *= 1.0 + uFat * fatZScale;
 
@@ -324,13 +304,12 @@ function injectAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-body-anatomy-v11";
+  material.customProgramCacheKey = () => "realistic-male-anatomy-v12";
 }
 
 function createSkinMaterial(
   appearance: CharacterAppearance,
   anatomy: AnatomyUniforms,
-  bodyType: CharacterBodyType,
 ) {
   const base = new THREE.Color(appearance.bodyColor);
   const material = new THREE.MeshPhysicalMaterial({
@@ -344,24 +323,19 @@ function createSkinMaterial(
     sheenRoughness: 0.82,
     envMapIntensity: 0.72,
   });
-  material.name = `${bodyType}-skin`;
+  material.name = "male-skin";
   injectAnatomyShader(material, anatomy);
   return material;
 }
 
-export function RealisticBody({
+export function RealisticMaleBody({
   appearance,
-  bodyType,
   anatomy,
-}: RealisticBodyProps) {
-  const modelPath =
-    bodyType === "female"
-      ? "/models/female-base.glb"
-      : "/models/male-base.glb";
-  const { scene } = useGLTF(modelPath);
+}: RealisticMaleBodyProps) {
+  const { scene } = useGLTF("/models/male-base.glb");
   const skinMaterial = useMemo(
-    () => createSkinMaterial(appearance, anatomy, bodyType),
-    [anatomy, appearance, bodyType],
+    () => createSkinMaterial(appearance, anatomy),
+    [anatomy, appearance],
   );
   const model = useMemo(() => scene.clone(true), [scene]);
 
@@ -393,4 +367,3 @@ export function RealisticBody({
 }
 
 useGLTF.preload("/models/male-base.glb");
-useGLTF.preload("/models/female-base.glb");

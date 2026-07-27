@@ -1068,23 +1068,23 @@ select:focus-visible,
   pointer-events: auto;
 }
 
-.input-variable-pill--proteinPerKg {
-  top: 0;
-  left: calc(50% - 184px);
-}
-
-.input-variable-pill--rir {
-  top: 0;
-  right: calc(50% - 184px);
-}
-
 .input-variable-pill--sleepHours {
-  top: 42%;
+  top: 0;
+  left: 0;
+}
+
+.input-variable-pill--proteinGrams {
+  top: 92px;
   left: 0;
 }
 
 .input-variable-pill--adherence {
-  top: 42%;
+  top: 0;
+  right: 0;
+}
+
+.input-variable-pill--rir {
+  top: 92px;
   right: 0;
 }
 
@@ -3418,6 +3418,26 @@ select:focus-visible,
   .input-variable-pill {
     position: static;
     width: auto;
+  }
+
+  .input-variable-pill--sleepHours {
+    grid-column: 1;
+    grid-row: 1;
+  }
+
+  .input-variable-pill--proteinGrams {
+    grid-column: 1;
+    grid-row: 2;
+  }
+
+  .input-variable-pill--adherence {
+    grid-column: 2;
+    grid-row: 1;
+  }
+
+  .input-variable-pill--rir {
+    grid-column: 2;
+    grid-row: 2;
   }
 
   .lab-stage-score {
