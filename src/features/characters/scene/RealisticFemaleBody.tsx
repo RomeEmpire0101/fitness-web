@@ -48,43 +48,49 @@ function injectFemaleAnatomyShader(
         float ax = abs(position.x);
         float front = smoothstep(0.018, 0.19, position.z);
         float rear = smoothstep(0.018, 0.19, -position.z);
+        float rearBias = 0.18 + rear * 0.82;
         float torso = 1.0 - smoothstep(0.36, 0.69, ax);
         float arms = femaleBand(ax, 0.53, 1.15, 0.2);
-        float legs = femaleBand(ax, 0.08, 0.66, 0.17);
+        float upperArms = femaleBand(ax, 0.58, 1.1, 0.18);
+        float legs = femaleBand(ax, 0.05, 0.72, 0.17);
+        float hips = 1.0 - smoothstep(0.72, 0.96, ax);
 
         float chestMask = femaleBand(position.y, 0.47, 1.2, 0.22) *
           front * torso;
-        float backMask = femaleBand(position.y, 0.35, 1.31, 0.28) *
-          rear * (1.0 - smoothstep(0.7, 0.94, ax));
+        float upperBackMask = femaleBand(position.y, 0.58, 1.52, 0.24) *
+          rearBias * (1.0 - smoothstep(0.86, 1.12, ax));
+        float latMask = femaleBand(position.y, 0.18, 1.14, 0.3) *
+          femaleBand(ax, 0.2, 0.8, 0.2) * (0.32 + rear * 0.68);
+        float backMask = max(upperBackMask, latMask);
         float shoulderMask = femaleBand(position.y, 0.78, 1.45, 0.2) *
           femaleBand(ax, 0.36, 0.88, 0.18);
         float bicepsMask = femaleBand(position.y, 0.08, 1.05, 0.25) *
           arms * front;
-        float tricepsMask = femaleBand(position.y, 0.08, 1.05, 0.25) *
-          arms * rear;
+        float tricepsMask = femaleBand(position.y, 0.26, 1.1, 0.23) *
+          upperArms * rear;
         float coreMask = femaleBand(position.y, -0.3, 0.69, 0.24) *
           torso * front;
-        float gluteMask = femaleBand(position.y, -0.78, 0.14, 0.28) *
-          legs * rear;
-        float quadMask = femaleBand(position.y, -1.47, -0.12, 0.3) *
-          legs * front;
-        float hamstringMask = femaleBand(position.y, -1.5, -0.12, 0.3) *
-          legs * rear;
-        float calfMask = femaleBand(position.y, -2.2, -1.04, 0.24) * legs;
+        float gluteMask = femaleBand(position.y, -0.86, 0.16, 0.3) *
+          hips * (0.2 + rear * 0.8);
+        float quadMask = femaleBand(position.y, -1.62, -0.06, 0.32) *
+          legs * (0.32 + front * 0.68);
+        float hamstringMask = femaleBand(position.y, -1.62, -0.06, 0.32) *
+          legs * (0.32 + rear * 0.68);
+        float calfMask = femaleBand(position.y, -2.24, -0.98, 0.25) * legs;
 
         // Female-specific hypertrophy favors glutes and legs, with a softer
         // upper-body response and a narrower transition through the waist.
         float muscleExpansion =
           uChest * chestMask * 0.062 +
-          uBack * backMask * 0.07 +
+          uBack * backMask * 0.09 +
           uShoulders * shoulderMask * 0.038 +
           uBiceps * bicepsMask * 0.017 +
-          uTriceps * tricepsMask * 0.017 +
+          uTriceps * tricepsMask * 0.01 +
           uCore * coreMask * 0.035 +
-          uGlutes * gluteMask * 0.105 +
-          uQuads * quadMask * 0.09 +
-          uHamstrings * hamstringMask * 0.09 +
-          uCalves * calfMask * 0.032;
+          uGlutes * gluteMask * 0.125 +
+          uQuads * quadMask * 0.12 +
+          uHamstrings * hamstringMask * 0.115 +
+          uCalves * calfMask * 0.045;
 
         float trunkEnvelope = femaleBand(position.y, -0.72, 1.24, 0.46) *
           (1.0 - smoothstep(0.66, 0.93, ax));
@@ -123,18 +129,21 @@ function injectFemaleAnatomyShader(
         );
         float regionalGrowth = uGrowth * muscleVisibility;
         transformed.x *= 1.0 + regionalGrowth * (
+          uBack * backMask * 0.04 +
           uShoulders * shoulderMask * 0.025 +
-          uGlutes * gluteMask * 0.035 +
-          uQuads * quadMask * 0.03 +
-          uHamstrings * hamstringMask * 0.025
+          uGlutes * gluteMask * 0.045 +
+          uQuads * quadMask * 0.045 +
+          uHamstrings * hamstringMask * 0.04 +
+          uCalves * calfMask * 0.022
         );
         transformed.z *= 1.0 + regionalGrowth * (
           uChest * chestMask * 0.04 +
-          uBack * backMask * 0.02 +
+          uBack * backMask * 0.035 +
           uCore * coreMask * 0.014 +
-          uGlutes * gluteMask * 0.065 +
-          uQuads * quadMask * 0.02 +
-          uHamstrings * hamstringMask * 0.02
+          uGlutes * gluteMask * 0.075 +
+          uQuads * quadMask * 0.04 +
+          uHamstrings * hamstringMask * 0.04 +
+          uCalves * calfMask * 0.022
         );
 
         float hipScale = femaleBand(position.y, -0.9, 0.08, 0.38) *
@@ -263,7 +272,7 @@ function injectFemaleAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-female-anatomy-v2";
+  material.customProgramCacheKey = () => "realistic-female-anatomy-v3";
 }
 
 function createFemaleSkinMaterial(

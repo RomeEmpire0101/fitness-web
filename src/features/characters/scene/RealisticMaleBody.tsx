@@ -67,42 +67,48 @@ function injectAnatomyShader(
         float ax = abs(position.x);
         float front = smoothstep(0.015, 0.2, position.z);
         float rear = smoothstep(0.015, 0.2, -position.z);
+        float rearBias = 0.16 + rear * 0.84;
         float centerTorso = 1.0 - smoothstep(0.38, 0.72, ax);
         float armZone = anatomyBand(ax, 0.58, 1.22, 0.2);
-        float legZone = anatomyBand(ax, 0.1, 0.62, 0.16);
+        float upperArmZone = anatomyBand(ax, 0.62, 1.16, 0.18);
+        float legZone = anatomyBand(ax, 0.055, 0.72, 0.17);
+        float hipZone = 1.0 - smoothstep(0.72, 0.94, ax);
 
         float chestMask = anatomyBand(position.y, 0.52, 1.3, 0.2) *
           front * centerTorso;
-        float backMask = anatomyBand(position.y, 0.42, 1.38, 0.24) *
-          rear * (1.0 - smoothstep(0.76, 1.15, ax));
+        float upperBackMask = anatomyBand(position.y, 0.64, 1.58, 0.22) *
+          rearBias * (1.0 - smoothstep(0.92, 1.18, ax));
+        float latMask = anatomyBand(position.y, 0.2, 1.2, 0.28) *
+          anatomyBand(ax, 0.22, 0.86, 0.2) * (0.3 + rear * 0.7);
+        float backMask = max(upperBackMask, latMask);
         float shoulderMask = anatomyBand(position.y, 0.82, 1.5, 0.18) *
           anatomyBand(ax, 0.42, 0.98, 0.18);
         float bicepsMask = anatomyBand(position.y, 0.12, 1.12, 0.24) *
           armZone * front;
-        float tricepsMask = anatomyBand(position.y, 0.12, 1.12, 0.24) *
-          armZone * rear;
+        float tricepsMask = anatomyBand(position.y, 0.3, 1.14, 0.22) *
+          upperArmZone * rear;
         float coreMask = anatomyBand(position.y, -0.25, 0.75, 0.2) *
           centerTorso * front;
-        float gluteMask = anatomyBand(position.y, -0.48, 0.22, 0.2) *
-          legZone * rear;
-        float quadMask = anatomyBand(position.y, -1.35, -0.18, 0.24) *
-          legZone * front;
-        float hamstringMask = anatomyBand(position.y, -1.38, -0.18, 0.24) *
-          legZone * rear;
-        float calfMask = anatomyBand(position.y, -2.18, -1.05, 0.22) *
+        float gluteMask = anatomyBand(position.y, -0.78, 0.18, 0.26) *
+          hipZone * (0.18 + rear * 0.82);
+        float quadMask = anatomyBand(position.y, -1.58, -0.08, 0.3) *
+          legZone * (0.3 + front * 0.7);
+        float hamstringMask = anatomyBand(position.y, -1.58, -0.08, 0.3) *
+          legZone * (0.3 + rear * 0.7);
+        float calfMask = anatomyBand(position.y, -2.24, -0.98, 0.24) *
           legZone;
 
         float expansion =
           uChest * chestMask * 0.09 +
-          uBack * backMask * 0.085 +
+          uBack * backMask * 0.11 +
           uShoulders * shoulderMask * 0.05 +
           uBiceps * bicepsMask * 0.022 +
-          uTriceps * tricepsMask * 0.021 +
+          uTriceps * tricepsMask * 0.012 +
           uCore * coreMask * 0.045 +
-          uGlutes * gluteMask * 0.09 +
-          uQuads * quadMask * 0.082 +
-          uHamstrings * hamstringMask * 0.078 +
-          uCalves * calfMask * 0.035;
+          uGlutes * gluteMask * 0.1 +
+          uQuads * quadMask * 0.11 +
+          uHamstrings * hamstringMask * 0.105 +
+          uCalves * calfMask * 0.052;
 
         // Broad overlapping envelopes produce a continuous subcutaneous layer.
         // Regional masks then bias where volume accumulates without creating
@@ -192,19 +198,21 @@ function injectAnatomyShader(
         );
         float regionalGrowth = uGrowth * muscleVisibility;
         transformed.x *= 1.0 + regionalGrowth * (
-          uBack * backMask * 0.025 +
+          uBack * backMask * 0.055 +
           uShoulders * shoulderMask * 0.035 +
-          uGlutes * gluteMask * 0.025 +
-          uQuads * quadMask * 0.025 +
-          uHamstrings * hamstringMask * 0.02
+          uGlutes * gluteMask * 0.035 +
+          uQuads * quadMask * 0.045 +
+          uHamstrings * hamstringMask * 0.04 +
+          uCalves * calfMask * 0.025
         );
         transformed.z *= 1.0 + regionalGrowth * (
           uChest * chestMask * 0.05 +
-          uBack * backMask * 0.025 +
+          uBack * backMask * 0.045 +
           uCore * coreMask * 0.018 +
-          uGlutes * gluteMask * 0.055 +
-          uQuads * quadMask * 0.018 +
-          uHamstrings * hamstringMask * 0.02
+          uGlutes * gluteMask * 0.07 +
+          uQuads * quadMask * 0.045 +
+          uHamstrings * hamstringMask * 0.045 +
+          uCalves * calfMask * 0.025
         );
 
         float maleCentralScale = anatomyBand(
@@ -320,7 +328,7 @@ function injectAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-male-anatomy-v13";
+  material.customProgramCacheKey = () => "realistic-male-anatomy-v14";
 }
 
 function createSkinMaterial(
