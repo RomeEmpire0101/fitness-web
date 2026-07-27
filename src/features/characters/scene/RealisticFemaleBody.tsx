@@ -6,6 +6,7 @@ import * as THREE from "three";
 import { CharacterAppearance } from "../types";
 import anatomyLimits from "./anatomyLimits.json";
 import { AnatomyUniforms } from "./RealisticMaleBody";
+import { addNeutralPositionAttribute } from "./neutralMesh";
 
 const FEMALE_ANATOMY_LIMITS = anatomyLimits.female;
 
@@ -28,6 +29,7 @@ function injectFemaleAnatomyShader(
         uniform float uGrowth;
         uniform float uWidth;
         uniform float uFat;
+        uniform float uBaselineMuscularity;
         uniform float uChest;
         uniform float uBack;
         uniform float uShoulders;
@@ -39,6 +41,8 @@ function injectFemaleAnatomyShader(
         uniform float uHamstrings;
         uniform float uGlutes;
         uniform float uCalves;
+        attribute vec3 aNeutralPosition;
+        attribute vec3 aNeutralNormal;
         varying vec3 vFemaleAnatomyPosition;
 
         float femaleBand(float value, float low, float high, float fade) {
@@ -47,8 +51,20 @@ function injectFemaleAnatomyShader(
         }
 
         float anatomySignal(float value) {
-          return clamp(value, 0.0, 1.0);
+          return clamp(value, -0.04, 0.13);
         }`,
+      )
+      .replace(
+        "#include <beginnormal_vertex>",
+        `float neutralNormalMask =
+          smoothstep(-2.36, -2.08, position.y) *
+          (1.0 - smoothstep(1.5, 1.82, position.y));
+        float neutralNormalBlend =
+          (1.0 - clamp(uBaselineMuscularity, 0.0, 1.0)) *
+          neutralNormalMask * 0.96;
+        vec3 objectNormal = normalize(
+          mix(aNeutralNormal, normal, 1.0 - neutralNormalBlend)
+        );`,
       )
       .replace(
         "#include <begin_vertex>",
@@ -88,30 +104,30 @@ function injectFemaleAnatomyShader(
           legs * (0.32 + rear * 0.68);
         float calfMask = femaleBand(position.y, -2.24, -0.98, 0.25) * legs;
 
-        // Female-specific hypertrophy favors glutes and legs, with a softer
-        // upper-body response and a narrower transition through the waist.
+        // Signals are physical linear changes derived from cube-root MRI
+        // volume changes. Radii are measured from the neutral source mesh.
         float chestExpansion =
-          anatomySignal(uChest) * chestMask * 0.062;
+          anatomySignal(uChest) * chestMask * 0.354;
         float backExpansion =
-          anatomySignal(uBack) * backMask * 0.09;
+          anatomySignal(uBack) * backMask * 0.354;
         float shoulderExpansion =
-          anatomySignal(uShoulders) * shoulderMask * 0.038;
+          anatomySignal(uShoulders) * shoulderMask * 0.338;
         float bicepsExpansion =
-          anatomySignal(uBiceps) * bicepsMask * 0.017;
+          anatomySignal(uBiceps) * bicepsMask * 0.178;
         float tricepsExpansion =
-          anatomySignal(uTriceps) * tricepsMask * 0.01;
+          anatomySignal(uTriceps) * tricepsMask * 0.178;
         float forearmExpansion =
-          anatomySignal(uForearms) * forearmMask * 0.017;
+          anatomySignal(uForearms) * forearmMask * 0.232;
         float coreExpansion =
-          anatomySignal(uCore) * coreMask * 0.035;
+          anatomySignal(uCore) * coreMask * 0.344;
         float gluteExpansion =
-          anatomySignal(uGlutes) * gluteMask * 0.125;
+          anatomySignal(uGlutes) * gluteMask * 0.372;
         float quadExpansion =
-          anatomySignal(uQuads) * quadMask * 0.12;
+          anatomySignal(uQuads) * quadMask * 0.348;
         float hamstringExpansion =
-          anatomySignal(uHamstrings) * hamstringMask * 0.115;
+          anatomySignal(uHamstrings) * hamstringMask * 0.348;
         float calfExpansion =
-          anatomySignal(uCalves) * calfMask * 0.045;
+          anatomySignal(uCalves) * calfMask * 0.218;
 
         // Use the strongest regional influence at shared vertices. Adding all
         // nearby muscles together creates impossible shoulder and thigh lobes.
@@ -163,7 +179,7 @@ function injectFemaleAnatomyShader(
           clamp(uFat * 0.76, 0.0, 1.0)
         );
         float muscleDisplacement = clamp(
-          muscleExpansion * anatomySignal(uGrowth) * muscleVisibility,
+          muscleExpansion * muscleVisibility,
           0.0,
           ${FEMALE_ANATOMY_LIMITS.maxNormalDisplacement.toFixed(3)}
         );
@@ -177,25 +193,45 @@ function injectFemaleAnatomyShader(
           0.0,
           ${FEMALE_ANATOMY_LIMITS.maxTotalNormalDisplacement.toFixed(3)}
         );
-        transformed += objectNormal * totalNormalDisplacement;
-
-        float regionalGrowth = anatomySignal(uGrowth) * muscleVisibility;
-        float lateralGrowth = clamp(
-          regionalGrowth * max(
+        float neutralEnvelope = max(
+          max(chestMask, backMask),
+          max(
+            max(shoulderMask, max(bicepsMask, tricepsMask)),
             max(
-              anatomySignal(uBack) * backMask * 0.04,
-              anatomySignal(uShoulders) * shoulderMask * 0.025
+              max(forearmMask, coreMask),
+              max(
+                max(gluteMask, quadMask),
+                max(hamstringMask, calfMask)
+              )
+            )
+          )
+        );
+        float baselineNeutralization =
+          (1.0 - clamp(uBaselineMuscularity, 0.0, 1.0)) *
+          neutralEnvelope;
+        transformed += (aNeutralPosition - position) *
+          baselineNeutralization * 0.94;
+        float baselineSoftening =
+          baselineNeutralization * 0.012;
+        transformed += objectNormal *
+          (totalNormalDisplacement - baselineSoftening);
+
+        float lateralGrowth = clamp(
+          muscleVisibility * max(
+            max(
+              anatomySignal(uBack) * backMask,
+              anatomySignal(uShoulders) * shoulderMask
             ),
             max(
               max(
-                anatomySignal(uGlutes) * gluteMask * 0.045,
-                anatomySignal(uQuads) * quadMask * 0.045
+                anatomySignal(uGlutes) * gluteMask,
+                anatomySignal(uQuads) * quadMask
               ),
               max(
-                anatomySignal(uHamstrings) * hamstringMask * 0.04,
+                anatomySignal(uHamstrings) * hamstringMask,
                 max(
-                  anatomySignal(uCalves) * calfMask * 0.022,
-                  anatomySignal(uForearms) * forearmMask * 0.018
+                  anatomySignal(uCalves) * calfMask,
+                  anatomySignal(uForearms) * forearmMask
                 )
               )
             )
@@ -204,23 +240,23 @@ function injectFemaleAnatomyShader(
           ${FEMALE_ANATOMY_LIMITS.maxLateralScale.toFixed(3)}
         );
         float depthGrowth = clamp(
-          regionalGrowth * max(
+          muscleVisibility * max(
             max(
-              anatomySignal(uChest) * chestMask * 0.04,
-              anatomySignal(uBack) * backMask * 0.035
+              anatomySignal(uChest) * chestMask,
+              anatomySignal(uBack) * backMask
             ),
             max(
               max(
-                anatomySignal(uCore) * coreMask * 0.014,
-                anatomySignal(uGlutes) * gluteMask * 0.052
+                anatomySignal(uCore) * coreMask,
+                anatomySignal(uGlutes) * gluteMask
               ),
               max(
-                anatomySignal(uQuads) * quadMask * 0.038,
+                anatomySignal(uQuads) * quadMask,
                 max(
-                  anatomySignal(uHamstrings) * hamstringMask * 0.038,
+                  anatomySignal(uHamstrings) * hamstringMask,
                   max(
-                    anatomySignal(uCalves) * calfMask * 0.02,
-                    anatomySignal(uForearms) * forearmMask * 0.02
+                    anatomySignal(uCalves) * calfMask,
+                    anatomySignal(uForearms) * forearmMask
                   )
                 )
               )
@@ -286,7 +322,7 @@ function injectFemaleAnatomyShader(
         }
 
         float femaleFragmentSignal(float value) {
-          return clamp(value, 0.0, 1.0);
+          return clamp(value / 0.06, 0.0, 1.0);
         }`,
       )
       .replace(
@@ -476,7 +512,7 @@ function injectFemaleAnatomyShader(
         float growthReveal = smoothstep(
           0.12,
           0.72,
-          femaleFragmentSignal(uGrowth) * regionalSignal
+          regionalSignal
         );
         float striationVisibility = lowFatReveal * growthReveal;
         float visibleStimulus = uStimulus * (
@@ -496,7 +532,7 @@ function injectFemaleAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-female-anatomy-v5";
+  material.customProgramCacheKey = () => "realistic-female-anatomy-v8";
 }
 
 function createFemaleSkinMaterial(
@@ -605,6 +641,7 @@ export function RealisticFemaleBody({
       const geometry = object.geometry.clone();
       geometry.deleteAttribute("normal");
       geometry.computeVertexNormals();
+      addNeutralPositionAttribute(geometry);
       object.geometry = geometry;
       object.material = skinMaterial;
       object.castShadow = true;

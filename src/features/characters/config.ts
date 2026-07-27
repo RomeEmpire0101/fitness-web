@@ -47,6 +47,66 @@ export const CHARACTER_MEASUREMENTS: CharacterMeasurementDefinition[] = [
     step: 1,
     description: "Sets the starting fat layer and muscle definition",
   },
+  {
+    id: "waistCm",
+    label: "Waist",
+    shortLabel: "Waist",
+    unit: "cm",
+    min: 50,
+    max: 160,
+    step: 0.5,
+    description: "Improves fat-distribution and body-composition uncertainty",
+  },
+  {
+    id: "neckCm",
+    label: "Neck",
+    shortLabel: "Neck",
+    unit: "cm",
+    min: 25,
+    max: 60,
+    step: 0.5,
+    description: "Provides a second circumference anchor",
+  },
+  {
+    id: "chestCm",
+    label: "Chest",
+    shortLabel: "Chest",
+    unit: "cm",
+    min: 65,
+    max: 160,
+    step: 0.5,
+    description: "Anchors the starting torso silhouette",
+  },
+  {
+    id: "upperArmCm",
+    label: "Upper arm",
+    shortLabel: "Arm",
+    unit: "cm",
+    min: 18,
+    max: 65,
+    step: 0.5,
+    description: "Anchors starting upper-body muscularity",
+  },
+  {
+    id: "thighCm",
+    label: "Thigh",
+    shortLabel: "Thigh",
+    unit: "cm",
+    min: 30,
+    max: 95,
+    step: 0.5,
+    description: "Anchors starting lower-body muscularity",
+  },
+  {
+    id: "hipCm",
+    label: "Hip",
+    shortLabel: "Hip",
+    unit: "cm",
+    min: 65,
+    max: 180,
+    step: 0.5,
+    description: "Anchors the pelvis and glute silhouette",
+  },
 ];
 
 export const CHARACTER_APPEARANCE_OPTIONS: CharacterAppearanceOption[] = [
@@ -144,6 +204,12 @@ export const DEFAULT_CHARACTER_PROFILE: CharacterProfile = {
     heightCm: 175,
     weightKg: 75,
     bodyFatPct: 18,
+    waistCm: 82,
+    neckCm: 37,
+    chestCm: 94,
+    upperArmCm: 31,
+    thighCm: 53,
+    hipCm: 94,
   },
   appearance: {
     bodyColor: CHARACTER_APPEARANCE_OPTIONS[0].bodyColor,
@@ -206,9 +272,13 @@ export function normalizeCharacterProfile(
       ? partial.wardrobe
       : fallback.wardrobe;
 
-  const height = Number(measurements.heightCm);
-  const weight = Number(measurements.weightKg);
-  const bodyFat = Number(measurements.bodyFatPct);
+  const numericMeasurement = (id: CharacterMeasurementId) => {
+    const value = Number(measurements[id]);
+    return clampMeasurement(
+      id,
+      Number.isFinite(value) ? value : fallback.measurements[id],
+    );
+  };
   const bodyColor =
     typeof appearance.bodyColor === "string"
       ? appearance.bodyColor
@@ -239,20 +309,15 @@ export function normalizeCharacterProfile(
         ? partial.bodyType
         : fallback.bodyType,
     measurements: {
-      heightCm: clampMeasurement(
-        "heightCm",
-        Number.isFinite(height) ? height : fallback.measurements.heightCm,
-      ),
-      weightKg: clampMeasurement(
-        "weightKg",
-        Number.isFinite(weight) ? weight : fallback.measurements.weightKg,
-      ),
-      bodyFatPct: clampMeasurement(
-        "bodyFatPct",
-        Number.isFinite(bodyFat)
-          ? bodyFat
-          : fallback.measurements.bodyFatPct,
-      ),
+      heightCm: numericMeasurement("heightCm"),
+      weightKg: numericMeasurement("weightKg"),
+      bodyFatPct: numericMeasurement("bodyFatPct"),
+      waistCm: numericMeasurement("waistCm"),
+      neckCm: numericMeasurement("neckCm"),
+      chestCm: numericMeasurement("chestCm"),
+      upperArmCm: numericMeasurement("upperArmCm"),
+      thighCm: numericMeasurement("thighCm"),
+      hipCm: numericMeasurement("hipCm"),
     },
     appearance: {
       bodyColor,

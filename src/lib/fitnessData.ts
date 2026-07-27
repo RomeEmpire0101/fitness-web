@@ -1,7 +1,9 @@
 import {
+  BODY_FAT_METHODS,
   createDefaultTrainingProgram,
   MUSCLE_GROUPS,
   MuscleGroupId,
+  RequiredInputKey,
   TrainingProgram,
 } from "./simulation";
 
@@ -148,9 +150,12 @@ function normalizeTrainingProgram(
       ? partial.muscles
       : fallback.muscles;
   const muscles = MUSCLE_GROUPS.reduce((normalized, muscle) => {
+    const rowHasScientificProvenance =
+      Array.isArray(partial.confirmedMuscles) &&
+      partial.confirmedMuscles.includes(muscle.id);
     normalized[muscle.id] = {
       ...fallback.muscles[muscle.id],
-      ...sourceMuscles[muscle.id],
+      ...(rowHasScientificProvenance ? sourceMuscles[muscle.id] : {}),
     };
     return normalized;
   }, { ...fallback.muscles });
@@ -165,6 +170,44 @@ function normalizeTrainingProgram(
     : isMuscleGroupId(legacyTarget)
       ? [legacyTarget]
       : fallback.targetMuscles;
+  const bodyFatMethod = BODY_FAT_METHODS.some(
+    (method) => method.id === partial.bodyFatMethod,
+  )
+    ? partial.bodyFatMethod!
+    : fallback.bodyFatMethod;
+  const knownInputKeys = new Set<RequiredInputKey>([
+    "age",
+    "trainingYears",
+    "dailyCalories",
+    "proteinGrams",
+    "rir",
+    "weeklySets",
+    "weeks",
+    "bodyFat",
+    "sleepHours",
+    "adherence",
+    "calorieBalance",
+    "sex",
+    "heightCm",
+    "weightKg",
+    "bodyFatPct",
+    "bodyFatMethod",
+    "waistCm",
+    "neckCm",
+    "chestCm",
+    "upperArmCm",
+    "thighCm",
+    "hipCm",
+  ]);
+  const confirmedInputs = Array.isArray(partial.confirmedInputs)
+    ? partial.confirmedInputs.filter(
+        (key): key is RequiredInputKey =>
+          typeof key === "string" && knownInputKeys.has(key as RequiredInputKey),
+      )
+    : fallback.confirmedInputs;
+  const confirmedMuscles = Array.isArray(partial.confirmedMuscles)
+    ? partial.confirmedMuscles.filter(isMuscleGroupId)
+    : fallback.confirmedMuscles;
 
   return {
     ...fallback,
@@ -177,5 +220,8 @@ function normalizeTrainingProgram(
     targetMuscles,
     values,
     muscles,
+    bodyFatMethod,
+    confirmedInputs,
+    confirmedMuscles,
   };
 }

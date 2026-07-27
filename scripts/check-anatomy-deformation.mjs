@@ -44,6 +44,9 @@ for (const body of bodies) {
   const requiredGuards = [
     "float anatomySignal(float value)",
     "uniform float uForearms;",
+    "uniform float uBaselineMuscularity;",
+    "attribute vec3 aNeutralPosition;",
+    "attribute vec3 aNeutralNormal;",
     "float forearmMask",
     "float regionalSignal = max(",
     "float striationVisibility",
@@ -53,6 +56,9 @@ for (const body of bodies) {
     "float totalNormalDisplacement = clamp(",
     "float lateralGrowth = clamp(",
     "float depthGrowth = clamp(",
+    "float baselineSoftening =",
+    "float baselineNeutralization =",
+    "float neutralNormalBlend =",
     `${body.constant}.maxNormalDisplacement`,
     `${body.constant}.maxTotalNormalDisplacement`,
     `${body.constant}.maxLateralScale`,
@@ -66,6 +72,43 @@ for (const body of bodies) {
     );
   }
 }
+
+const maleSource = await fs.readFile(
+  new URL("src/features/characters/scene/RealisticMaleBody.tsx", root),
+  "utf8",
+);
+const femaleSource = await fs.readFile(
+  new URL("src/features/characters/scene/RealisticFemaleBody.tsx", root),
+  "utf8",
+);
+for (const source of [maleSource, femaleSource]) {
+  assert(
+    !source.includes("anatomySignal(uGrowth) * muscleVisibility"),
+    "Regional physical signals must not be multiplied by global growth again.",
+  );
+  assert(
+    source.includes("value / 0.06"),
+    "Fragment shading must normalize physical radial growth separately.",
+  );
+}
+assert(
+  maleSource.includes("chestMask * 0.373"),
+  "Male mesh must retain measured regional-radius calibration.",
+);
+assert(
+  femaleSource.includes("chestMask * 0.354"),
+  "Female mesh must retain measured regional-radius calibration.",
+);
+
+const neutralMeshSource = await fs.readFile(
+  new URL("src/features/characters/scene/neutralMesh.ts", root),
+  "utf8",
+);
+assert(
+  neutralMeshSource.includes("new Uint32Array(vertexCount)") &&
+    neutralMeshSource.includes("computeVertexNormals()"),
+  "Baseline neutralization must smooth both geometry and surface normals.",
+);
 
 const characterModel = await fs.readFile(
   new URL(
@@ -86,6 +129,10 @@ assert(
   characterModel.includes("anatomy.uForearms.value = damp("),
   "Forearm growth must be animated with the other regional signals",
 );
+assert(
+  characterModel.includes("anatomy.uBaselineMuscularity.value = baseMuscle"),
+  "The athletic source mesh must be neutralized by baseline muscularity.",
+);
 
 const simulation = await fs.readFile(
   new URL("src/lib/simulation.ts", root),
@@ -96,12 +143,12 @@ assert(
   "Non-synergist muscles must not receive phantom growth",
 );
 assert(
-  simulation.includes("back: { shoulders: 0.25, biceps: 0.4, forearms: 0.55 }"),
-  "Back training must include grip-driven forearm carryover",
+  simulation.includes("Math.cbrt(1 + meanPercent / 100) - 1"),
+  "Mesh growth must convert measured MRI volume change to linear deformation.",
 );
 assert(
-  simulation.includes("forearms: { back: 0.25, biceps: 0.35 }"),
-  "Forearms must remain an independently targetable muscle group",
+  !simulation.includes("TARGET_SYNERGIES"),
+  "Arbitrary target-synergy multipliers must not return.",
 );
 
 console.log("Anatomy deformation safety checks passed.");

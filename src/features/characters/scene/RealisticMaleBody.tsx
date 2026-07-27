@@ -5,6 +5,7 @@ import { useEffect, useMemo } from "react";
 import * as THREE from "three";
 import { CharacterAppearance } from "../types";
 import anatomyLimits from "./anatomyLimits.json";
+import { addNeutralPositionAttribute } from "./neutralMesh";
 
 const MALE_ANATOMY_LIMITS = anatomyLimits.male;
 
@@ -14,6 +15,7 @@ export type AnatomyUniforms = {
   uStimulus: { value: number };
   uWidth: { value: number };
   uFat: { value: number };
+  uBaselineMuscularity: { value: number };
   uFeminine: { value: number };
   uChest: { value: number };
   uBack: { value: number };
@@ -48,6 +50,7 @@ function injectAnatomyShader(
         uniform float uGrowth;
         uniform float uWidth;
         uniform float uFat;
+        uniform float uBaselineMuscularity;
         uniform float uChest;
         uniform float uBack;
         uniform float uShoulders;
@@ -59,6 +62,8 @@ function injectAnatomyShader(
         uniform float uHamstrings;
         uniform float uGlutes;
         uniform float uCalves;
+        attribute vec3 aNeutralPosition;
+        attribute vec3 aNeutralNormal;
         varying vec3 vAnatomyPosition;
 
         float anatomyBand(float value, float low, float high, float fade) {
@@ -67,8 +72,20 @@ function injectAnatomyShader(
         }
 
         float anatomySignal(float value) {
-          return clamp(value, 0.0, 1.0);
+          return clamp(value, -0.04, 0.13);
         }`,
+      )
+      .replace(
+        "#include <beginnormal_vertex>",
+        `float neutralNormalMask =
+          smoothstep(-2.36, -2.08, position.y) *
+          (1.0 - smoothstep(1.5, 1.82, position.y));
+        float neutralNormalBlend =
+          (1.0 - clamp(uBaselineMuscularity, 0.0, 1.0)) *
+          neutralNormalMask * 0.96;
+        vec3 objectNormal = normalize(
+          mix(aNeutralNormal, normal, 1.0 - neutralNormalBlend)
+        );`,
       )
       .replace(
         "#include <begin_vertex>",
@@ -109,28 +126,31 @@ function injectAnatomyShader(
         float calfMask = anatomyBand(position.y, -2.24, -0.98, 0.24) *
           legZone;
 
+        // Signals are physical linear changes derived from cube-root MRI
+        // volume changes. Regional radii were measured from the source mesh,
+        // so a 2% radial signal displaces a 0.37-unit chest by ~0.0074 units.
         float chestExpansion =
-          anatomySignal(uChest) * chestMask * 0.09;
+          anatomySignal(uChest) * chestMask * 0.373;
         float backExpansion =
-          anatomySignal(uBack) * backMask * 0.11;
+          anatomySignal(uBack) * backMask * 0.373;
         float shoulderExpansion =
-          anatomySignal(uShoulders) * shoulderMask * 0.05;
+          anatomySignal(uShoulders) * shoulderMask * 0.368;
         float bicepsExpansion =
-          anatomySignal(uBiceps) * bicepsMask * 0.022;
+          anatomySignal(uBiceps) * bicepsMask * 0.19;
         float tricepsExpansion =
-          anatomySignal(uTriceps) * tricepsMask * 0.012;
+          anatomySignal(uTriceps) * tricepsMask * 0.19;
         float forearmExpansion =
-          anatomySignal(uForearms) * forearmMask * 0.021;
+          anatomySignal(uForearms) * forearmMask * 0.247;
         float coreExpansion =
-          anatomySignal(uCore) * coreMask * 0.045;
+          anatomySignal(uCore) * coreMask * 0.363;
         float gluteExpansion =
-          anatomySignal(uGlutes) * gluteMask * 0.1;
+          anatomySignal(uGlutes) * gluteMask * 0.355;
         float quadExpansion =
-          anatomySignal(uQuads) * quadMask * 0.11;
+          anatomySignal(uQuads) * quadMask * 0.339;
         float hamstringExpansion =
-          anatomySignal(uHamstrings) * hamstringMask * 0.105;
+          anatomySignal(uHamstrings) * hamstringMask * 0.339;
         float calfExpansion =
-          anatomySignal(uCalves) * calfMask * 0.052;
+          anatomySignal(uCalves) * calfMask * 0.227;
 
         // Regional responses blend by maximum influence instead of stacking.
         // This prevents overlapping muscles from ballooning shared vertices.
@@ -233,7 +253,7 @@ function injectAnatomyShader(
           clamp(uFat * 0.78, 0.0, 1.0)
         );
         float muscleDisplacement = clamp(
-          expansion * anatomySignal(uGrowth) * muscleVisibility,
+          expansion * muscleVisibility,
           0.0,
           ${MALE_ANATOMY_LIMITS.maxNormalDisplacement.toFixed(3)}
         );
@@ -247,25 +267,48 @@ function injectAnatomyShader(
           0.0,
           ${MALE_ANATOMY_LIMITS.maxTotalNormalDisplacement.toFixed(3)}
         );
-        transformed += objectNormal * totalNormalDisplacement;
-
-        float regionalGrowth = anatomySignal(uGrowth) * muscleVisibility;
-        float lateralGrowth = clamp(
-          regionalGrowth * max(
+        // The source scan is athletic. This negative-only correction creates
+        // a neutral baseline and is reduced by measured FFMI/circumferences
+        // and training history rather than assigning everyone the same body.
+        float neutralEnvelope = max(
+          max(chestMask, backMask),
+          max(
+            max(shoulderMask, max(bicepsMask, tricepsMask)),
             max(
-              anatomySignal(uBack) * backMask * 0.055,
-              anatomySignal(uShoulders) * shoulderMask * 0.035
+              max(forearmMask, coreMask),
+              max(
+                max(gluteMask, quadMask),
+                max(hamstringMask, calfMask)
+              )
+            )
+          )
+        );
+        float baselineNeutralization =
+          (1.0 - clamp(uBaselineMuscularity, 0.0, 1.0)) *
+          neutralEnvelope;
+        transformed += (aNeutralPosition - position) *
+          baselineNeutralization * 0.94;
+        float baselineSoftening =
+          baselineNeutralization * 0.014;
+        transformed += objectNormal *
+          (totalNormalDisplacement - baselineSoftening);
+
+        float lateralGrowth = clamp(
+          muscleVisibility * max(
+            max(
+              anatomySignal(uBack) * backMask,
+              anatomySignal(uShoulders) * shoulderMask
             ),
             max(
               max(
-                anatomySignal(uGlutes) * gluteMask * 0.035,
-                anatomySignal(uQuads) * quadMask * 0.045
+                anatomySignal(uGlutes) * gluteMask,
+                anatomySignal(uQuads) * quadMask
               ),
               max(
-                anatomySignal(uHamstrings) * hamstringMask * 0.04,
+                anatomySignal(uHamstrings) * hamstringMask,
                 max(
-                  anatomySignal(uCalves) * calfMask * 0.025,
-                  anatomySignal(uForearms) * forearmMask * 0.022
+                  anatomySignal(uCalves) * calfMask,
+                  anatomySignal(uForearms) * forearmMask
                 )
               )
             )
@@ -274,23 +317,23 @@ function injectAnatomyShader(
           ${MALE_ANATOMY_LIMITS.maxLateralScale.toFixed(3)}
         );
         float depthGrowth = clamp(
-          regionalGrowth * max(
+          muscleVisibility * max(
             max(
-              anatomySignal(uChest) * chestMask * 0.05,
-              anatomySignal(uBack) * backMask * 0.045
+              anatomySignal(uChest) * chestMask,
+              anatomySignal(uBack) * backMask
             ),
             max(
               max(
-                anatomySignal(uCore) * coreMask * 0.018,
-                anatomySignal(uGlutes) * gluteMask * 0.055
+                anatomySignal(uCore) * coreMask,
+                anatomySignal(uGlutes) * gluteMask
               ),
               max(
-                anatomySignal(uQuads) * quadMask * 0.04,
+                anatomySignal(uQuads) * quadMask,
                 max(
-                  anatomySignal(uHamstrings) * hamstringMask * 0.04,
+                  anatomySignal(uHamstrings) * hamstringMask,
                   max(
-                    anatomySignal(uCalves) * calfMask * 0.022,
-                    anatomySignal(uForearms) * forearmMask * 0.024
+                    anatomySignal(uCalves) * calfMask,
+                    anatomySignal(uForearms) * forearmMask
                   )
                 )
               )
@@ -372,7 +415,7 @@ function injectAnatomyShader(
         }
 
         float fragmentAnatomySignal(float value) {
-          return clamp(value, 0.0, 1.0);
+          return clamp(value / 0.06, 0.0, 1.0);
         }`,
       )
       .replace(
@@ -537,7 +580,7 @@ function injectAnatomyShader(
         float growthReveal = smoothstep(
           0.12,
           0.72,
-          fragmentAnatomySignal(uGrowth) * regionalSignal
+          regionalSignal
         );
         float striationVisibility = lowFatReveal * growthReveal;
         float visibleStimulus = uStimulus * (
@@ -557,7 +600,7 @@ function injectAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-male-anatomy-v16";
+  material.customProgramCacheKey = () => "realistic-male-anatomy-v19";
 }
 
 function createSkinMaterial(
@@ -599,6 +642,7 @@ export function RealisticMaleBody({
       const geometry = object.geometry.clone();
       geometry.deleteAttribute("normal");
       geometry.computeVertexNormals();
+      addNeutralPositionAttribute(geometry);
       object.geometry = geometry;
       object.material = skinMaterial;
       object.castShadow = true;

@@ -31,6 +31,7 @@ export function CharacterModel({
   growth,
   definition,
   stimulus,
+  baselineMuscularity = 0.25,
   muscleSignals,
   reducedMotion,
 }: CharacterModelProps) {
@@ -50,18 +51,19 @@ export function CharacterModel({
       uStimulus: { value: stimulus },
       uWidth: { value: morphology.widthScale },
       uFat: { value: morphology.fatLevel },
+      uBaselineMuscularity: { value: baselineMuscularity },
       uFeminine: { value: profile.bodyType === "female" ? 1 : 0 },
-      uChest: { value: muscleSignals?.chest ?? growth },
-      uBack: { value: muscleSignals?.back ?? growth },
-      uShoulders: { value: muscleSignals?.shoulders ?? growth },
-      uBiceps: { value: muscleSignals?.biceps ?? growth },
-      uTriceps: { value: muscleSignals?.triceps ?? growth },
-      uForearms: { value: muscleSignals?.forearms ?? growth },
-      uCore: { value: muscleSignals?.core ?? growth },
-      uQuads: { value: muscleSignals?.quads ?? growth },
-      uHamstrings: { value: muscleSignals?.hamstrings ?? growth },
-      uGlutes: { value: muscleSignals?.glutes ?? growth },
-      uCalves: { value: muscleSignals?.calves ?? growth },
+      uChest: { value: muscleSignals?.chest ?? 0 },
+      uBack: { value: muscleSignals?.back ?? 0 },
+      uShoulders: { value: muscleSignals?.shoulders ?? 0 },
+      uBiceps: { value: muscleSignals?.biceps ?? 0 },
+      uTriceps: { value: muscleSignals?.triceps ?? 0 },
+      uForearms: { value: muscleSignals?.forearms ?? 0 },
+      uCore: { value: muscleSignals?.core ?? 0 },
+      uQuads: { value: muscleSignals?.quads ?? 0 },
+      uHamstrings: { value: muscleSignals?.hamstrings ?? 0 },
+      uGlutes: { value: muscleSignals?.glutes ?? 0 },
+      uCalves: { value: muscleSignals?.calves ?? 0 },
       uStimulusColor: { value: new THREE.Color("#b85b48") },
     }),
     [],
@@ -72,6 +74,7 @@ export function CharacterModel({
   const currentHeight = useRef(morphology.heightScale);
   const currentWidth = useRef(morphology.widthScale);
   const currentFat = useRef(morphology.fatLevel);
+  const currentBaselineMuscularity = useRef(baselineMuscularity);
   const currentFeminine = useRef(profile.bodyType === "female" ? 1 : 0);
 
   useFrame(({ clock }, delta) => {
@@ -96,6 +99,12 @@ export function CharacterModel({
       4.6,
       delta,
     );
+    const baseMuscle = damp(
+      currentBaselineMuscularity.current,
+      baselineMuscularity,
+      4.8,
+      delta,
+    );
     const feminine = damp(
       currentFeminine.current,
       profile.bodyType === "female" ? 1 : 0,
@@ -108,6 +117,7 @@ export function CharacterModel({
     currentHeight.current = height;
     currentWidth.current = width;
     currentFat.current = fat;
+    currentBaselineMuscularity.current = baseMuscle;
     currentFeminine.current = feminine;
 
     const elapsed = clock.getElapsedTime();
@@ -131,12 +141,13 @@ export function CharacterModel({
       breath.current.scale.z = 1 + inhale * 0.006;
     }
     const signal = (id: keyof NonNullable<typeof muscleSignals>) =>
-      muscleSignals?.[id] ?? g;
+      muscleSignals?.[id] ?? 0;
     anatomy.uGrowth.value = g;
     anatomy.uDefinition.value = d;
     anatomy.uStimulus.value = s;
     anatomy.uWidth.value = width;
     anatomy.uFat.value = fat;
+    anatomy.uBaselineMuscularity.value = baseMuscle;
     anatomy.uFeminine.value = feminine;
     anatomy.uChest.value = damp(anatomy.uChest.value, signal("chest"), 5, delta);
     anatomy.uBack.value = damp(anatomy.uBack.value, signal("back"), 5, delta);

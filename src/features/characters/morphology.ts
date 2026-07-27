@@ -48,18 +48,34 @@ export function deriveCharacterMorphology(
   const bodyFatFraction = measurements.bodyFatPct / 100;
   const leanMass = measurements.weightKg * (1 - bodyFatFraction);
   const fatFreeMassIndex = leanMass / Math.pow(heightMeters, 2);
+  const chestScale = clamp(
+    measurements.chestCm / Math.max(measurements.heightCm * 0.54, 1),
+    0.82,
+    1.24,
+  );
+  const thighScale = clamp(
+    measurements.thighCm / Math.max(measurements.heightCm * 0.3, 1),
+    0.82,
+    1.24,
+  );
+  const circumferenceScale = chestScale * 0.6 + thighScale * 0.4;
 
   // Structural width follows fat-free mass relative to height. Fat has its own
   // regional deformation path in the anatomy shaders.
   const structuralFfmi = clamp(fatFreeMassIndex, 13.5, 26);
   const widthScale = clamp(
-    Math.sqrt(structuralFfmi / BASE_FFMI),
+    Math.sqrt(structuralFfmi / BASE_FFMI) * 0.72 +
+      circumferenceScale * 0.28,
     0.83,
     1.13,
   );
 
+  const waistToHeight =
+    measurements.waistCm / Math.max(measurements.heightCm, 1);
+  const waistFatSignal = smootherstep(0.38, 0.68, waistToHeight);
   const fatLevel = clamp(
-    smootherstep(8, 40, measurements.bodyFatPct) +
+    smootherstep(8, 40, measurements.bodyFatPct) * 0.72 +
+      waistFatSignal * 0.28 +
       clamp((measurements.bodyFatPct - 40) / 25, 0, 0.18),
     0,
     1.18,
