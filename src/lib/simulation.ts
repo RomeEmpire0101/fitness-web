@@ -2,6 +2,7 @@ import {
   Activity,
   Beef,
   CalendarRange,
+  Dumbbell,
   Flame,
   Gauge,
   LucideIcon,
@@ -20,6 +21,7 @@ export type EquipmentId =
 export type MetricId =
   | "proteinGrams"
   | "rir"
+  | "weeklySets"
   | "weeks"
   | "bodyFat"
   | "sleepHours"
@@ -97,6 +99,14 @@ export type PhysiqueResult = {
   recoveryLoad: number;
   balance: number;
   averageSets: number;
+  proteinPerKg: number;
+  estimatedLeanGainKg: number;
+  lowerLeanGainKg: number;
+  upperLeanGainKg: number;
+  projectedWeightKg: number;
+  startingBodyFatPct: number;
+  projectedBodyFatPct: number;
+  durationWeeks: number;
   stage: "Foundation" | "Building" | "Momentum" | "High adaptation";
   status: string;
   guidance: string;
@@ -185,6 +195,30 @@ export const METRICS: MetricDefinition[] = [
           : value <= 3
             ? "Moderate effort"
             : "Plenty left",
+  },
+  {
+    id: "weeklySets",
+    group: "training",
+    label: "Weekly hard sets",
+    question: "How many hard sets will each muscle average per week?",
+    unit: "hard sets per muscle per week",
+    shortUnit: "sets",
+    min: 4,
+    max: 24,
+    step: 1,
+    initial: 12,
+    accent: "#4d4f57",
+    description: "Use the weekly average for a typical trained muscle group.",
+    lowLabel: "4 sets",
+    highLabel: "24 sets",
+    recommendation: "Most people can start around 8–14 hard sets per muscle.",
+    Icon: Dumbbell,
+    describe: (value) =>
+      value < 8
+        ? "Low volume"
+        : value <= 16
+          ? "Productive range"
+          : "High volume",
   },
   {
     id: "weeks",
@@ -360,158 +394,120 @@ const smoothstep = (edge0: number, edge1: number, value: number) => {
   return x * x * (3 - 2 * x);
 };
 
-const average = (values: number[]) =>
-  values.reduce((total, value) => total + value, 0) /
-  Math.max(values.length, 1);
-
-const getGoalEnergyTarget = (goal: GoalId) => {
-  if (goal === "build") return 200;
-  if (goal === "cut") return -350;
-  if (goal === "strength") return 100;
-  return 0;
+type PhysiqueMeasurements = {
+  heightCm: number;
+  weightKg: number;
+  bodyFatPct: number;
 };
 
 /**
- * An explainable, deterministic training model. It visualizes relationships
- * between inputs and deliberately avoids predicting kilograms of muscle,
- * clinical body composition, or an exact future appearance.
+ * An explainable projection model for the MVP. Starting measurements establish
+ * body composition; explicit training and recovery inputs estimate a bounded
+ * lean-mass range over the selected duration. The range is illustrative rather
+ * than a medical or guaranteed prediction.
  */
-export function derivePhysique(program: TrainingProgram): PhysiqueResult {
-  const { values, muscles } = program;
+export function derivePhysique(
+  program: TrainingProgram,
+  measurements: PhysiqueMeasurements,
+): PhysiqueResult {
+  const { values } = program;
   const adherence = values.adherence / 100;
-  const proteinSupport = smoothstep(55, 150, values.proteinGrams);
-  const sleepSupport = smoothstep(4.5, 8.3, values.sleepHours);
-  const effortQuality = clamp(1 - Math.abs(values.rir - 2) * 0.13, 0.5, 1);
-  const failureCost = values.rir < 1 ? 0.24 : values.rir < 2 ? 0.08 : 0;
-  const wholeBodyTrainingSignal = clamp(
-    0.62 + (program.daysPerWeek - 2) * 0.07,
-    0.58,
-    0.86,
+  const proteinPerKg =
+    values.proteinGrams / Math.max(measurements.weightKg, 1);
+  const proteinSupport = smoothstep(0.75, 1.65, proteinPerKg);
+  const sleepSupport = smoothstep(5, 8.5, values.sleepHours);
+  const effortQuality =
+    values.rir === 0
+      ? 0.88
+      : values.rir <= 2
+        ? 1
+        : clamp(1 - (values.rir - 2) * 0.14, 0.58, 1);
+
+  const completedWeeklySets = values.weeklySets * adherence;
+  const volumeSignal = smoothstep(3, 15, completedWeeklySets);
+  const highVolumeCost = smoothstep(18, 24, values.weeklySets) * 0.22;
+  const stimulus = clamp(
+    volumeSignal * effortQuality * (1 - highVolumeCost),
+  );
+  const recoveryCapacity = clamp(
+    proteinSupport * 0.52 + sleepSupport * 0.48,
+  );
+  const recoveryLoad = clamp(
+    highVolumeCost + (values.rir === 0 ? 0.1 : 0) +
+      (1 - sleepSupport) * 0.18,
+  );
+  const recoveryFactor = clamp(
+    (0.6 + recoveryCapacity * 0.4) * (1 - recoveryLoad * 0.24),
+    0.45,
+    1,
   );
 
-  const muscleSignals = MUSCLE_GROUPS.reduce((signals, definition) => {
-    const setting = muscles[definition.id];
-    const volumeSignal =
-      setting.sets > 0
-        ? smoothstep(2, 18, setting.sets)
-        : wholeBodyTrainingSignal;
-    const priorityBoost = 0.84 + (setting.priority - 1) * 0.08;
-    signals[definition.id] = clamp(
-      volumeSignal * effortQuality * adherence * priorityBoost,
-    );
+  const monthlyGainRate = 0.006;
+  const durationMonths = values.weeks / 4.345;
+  const potentialLeanGain =
+    measurements.weightKg * monthlyGainRate * durationMonths;
+  const estimatedLeanGainKg = Math.max(
+    0,
+    potentialLeanGain * stimulus * recoveryFactor,
+  );
+  const lowerLeanGainKg = estimatedLeanGainKg * 0.75;
+  const upperLeanGainKg = estimatedLeanGainKg * 1.25;
+  const projectedWeightKg =
+    measurements.weightKg + estimatedLeanGainKg;
+  const startingFatMassKg =
+    measurements.weightKg * (measurements.bodyFatPct / 100);
+  const projectedBodyFatPct = clamp(
+    (startingFatMassKg / Math.max(projectedWeightKg, 1)) * 100,
+    3,
+    55,
+  );
+
+  // Visual growth is normalized to the person's frame and used exactly once
+  // by the anatomy shader. Regional signals stay at one because this MVP uses
+  // a balanced whole-body training dose rather than hidden muscle settings.
+  const growth = clamp(
+    estimatedLeanGainKg /
+      Math.max(1.1, measurements.weightKg * 0.025),
+  );
+  const definition = clamp((42 - projectedBodyFatPct) / 36);
+  const balance = recoveryCapacity;
+  const readiness = Math.round(recoveryCapacity * 100);
+  const adaptation = Math.round(growth * 100);
+  const muscleSignals = MUSCLE_GROUPS.reduce((signals, muscle) => {
+    signals[muscle.id] = 1;
     return signals;
   }, {} as Record<MuscleGroupId, number>);
 
-  const averageSets = average(
-    MUSCLE_GROUPS.map((muscle) =>
-      muscles[muscle.id].sets > 0
-        ? muscles[muscle.id].sets
-        : wholeBodyTrainingSignal * 14,
-    ),
-  );
-  const volumeSignal = average(Object.values(muscleSignals));
-  const excessVolume = average(
-    MUSCLE_GROUPS.map((muscle) =>
-      smoothstep(18, 28, muscles[muscle.id].sets),
-    ),
-  );
-  const sleepDeficit = 1 - sleepSupport;
-  const recoveryLoad = clamp(
-    excessVolume * 0.58 + failureCost + sleepDeficit * 0.32,
-  );
-  const recoveryCapacity = clamp(
-    sleepSupport * 0.55 + proteinSupport * 0.28 + adherence * 0.17,
-  );
-  const recoveryFactor = clamp(
-    0.6 + recoveryCapacity * 0.4 - recoveryLoad * 0.32,
-    0.35,
-    1,
-  );
-
-  const energyTarget = getGoalEnergyTarget(program.goal);
-  const energyAlignment = clamp(
-    1 - Math.abs(values.calorieBalance - energyTarget) / 900,
-    0.4,
-    1,
-  );
-  const stimulus = clamp(volumeSignal * (0.54 + effortQuality * 0.46));
-  const timeAdaptation = 1 - Math.exp(-values.weeks / 14);
-  const goalGrowthFactor =
-    program.goal === "build"
-      ? 1
-      : program.goal === "recomp"
-        ? 0.88
-        : program.goal === "strength"
-          ? 0.8
-          : 0.68;
-
-  const growth = clamp(
-    stimulus *
-      timeAdaptation *
-      (0.54 + proteinSupport * 0.46) *
-      recoveryFactor *
-      energyAlignment *
-      goalGrowthFactor,
-  );
-  const leanness = clamp((42 - values.bodyFat) / 36);
-  const deficitDefinition =
-    program.goal === "cut"
-      ? smoothstep(0, 600, Math.max(0, -values.calorieBalance))
-      : 0;
-  const definition = clamp(
-    leanness * 0.72 + growth * 0.22 + deficitDefinition * 0.06,
-  );
-  const balance = clamp(
-    recoveryCapacity * 0.48 +
-      energyAlignment * 0.24 +
-      (1 - recoveryLoad) * 0.28,
-  );
-  const readiness = Math.round(
-    clamp(recoveryCapacity * 0.72 + (1 - recoveryLoad) * 0.28) * 100,
-  );
-  const adaptation = Math.round(
-    clamp(
-      growth * 0.66 +
-        definition * 0.12 +
-        balance * stimulus * 0.16 +
-        adherence * timeAdaptation * 0.06,
-    ) * 100,
-  );
-
   const stage: PhysiqueResult["stage"] =
-    adaptation < 24
+    values.weeks < 8
       ? "Foundation"
-      : adaptation < 46
+      : values.weeks < 16
         ? "Building"
-        : adaptation < 70
+        : values.weeks < 28
           ? "Momentum"
           : "High adaptation";
 
   const status =
-    recoveryLoad > 0.55
-      ? "Recovery is the limiter"
-      : adherence < 0.7
-        ? "Consistency is the limiter"
-        : proteinSupport < 0.58
-          ? "Nutrition support is low"
-          : stimulus < 0.35
-            ? "More training signal available"
-            : balance > 0.78
-              ? "Inputs are well balanced"
-              : "Adaptation is building";
+    adherence < 0.65
+      ? "Consistency limits completed volume"
+      : proteinSupport < 0.7
+        ? "Protein is low for this body weight"
+        : sleepSupport < 0.65
+          ? "Sleep limits recovery"
+          : stimulus < 0.45
+            ? "Training dose is modest"
+            : "Inputs support steady progress";
 
   const guidance =
-    recoveryLoad > 0.55
-      ? "Reduce high-volume muscle groups or leave another rep in reserve."
-      : adherence < 0.7
-        ? "A smaller repeatable plan will outperform a larger plan that is often missed."
-        : proteinSupport < 0.58
-          ? "Protein support is trailing the selected training demand."
-          : sleepDeficit > 0.45
-            ? "More sleep would improve recovery for this program."
-            : stimulus < 0.35
-              ? "Raise weekly sets for one or two priority muscle groups."
-              : "The selected inputs support one another. Keep the plan repeatable.";
+    adherence < 0.65
+      ? "Reduce planned volume until the weekly target is repeatable."
+      : proteinSupport < 0.7
+        ? "Raise daily protein relative to the current body weight."
+        : sleepSupport < 0.65
+          ? "More consistent sleep would improve the projection."
+          : stimulus < 0.45
+            ? "Add a small amount of weekly hard-set volume."
+            : "Keep the plan stable and reassess after the selected duration.";
 
   return {
     adaptation,
@@ -521,7 +517,15 @@ export function derivePhysique(program: TrainingProgram): PhysiqueResult {
     stimulus,
     recoveryLoad,
     balance,
-    averageSets,
+    averageSets: values.weeklySets,
+    proteinPerKg,
+    estimatedLeanGainKg,
+    lowerLeanGainKg,
+    upperLeanGainKg,
+    projectedWeightKg,
+    startingBodyFatPct: measurements.bodyFatPct,
+    projectedBodyFatPct,
+    durationWeeks: values.weeks,
     stage,
     status,
     guidance,

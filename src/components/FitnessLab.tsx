@@ -27,7 +27,10 @@ export function FitnessLab() {
     resetProfile,
   } = useCharacterProfile();
 
-  const result = useMemo(() => derivePhysique(program), [program]);
+  const result = useMemo(
+    () => derivePhysique(program, profile.measurements),
+    [profile.measurements, program],
+  );
 
   const updateProgram = (
     update: (program: TrainingProgram) => TrainingProgram,

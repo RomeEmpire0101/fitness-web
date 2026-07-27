@@ -47,20 +47,28 @@ type LabScreenProps = {
 const INPUT_LABELS: Partial<Record<MetricId, string>> = {
   proteinGrams: "Protein",
   rir: "Reps left",
+  weeklySets: "Hard sets / muscle",
+  weeks: "Duration",
   sleepHours: "Sleep",
   adherence: "Consistency",
 };
 
-const INPUT_METRIC_IDS = [
-  "sleepHours",
-  "proteinGrams",
-  "adherence",
+const TRAINING_INPUT_IDS = [
+  "weeks",
+  "weeklySets",
   "rir",
 ] as const satisfies readonly MetricId[];
 
-const INPUT_METRICS = INPUT_METRIC_IDS.map(
+const RECOVERY_INPUT_IDS = [
+  "sleepHours",
+  "proteinGrams",
+  "adherence",
+] as const satisfies readonly MetricId[];
+
+const getInputMetrics = (ids: readonly MetricId[]) =>
+  ids.map(
   (id) => METRICS.find((metric) => metric.id === id)!,
-);
+  );
 
 type InputVariableControlProps = {
   metric: MetricDefinition;
@@ -177,6 +185,9 @@ export function LabScreen({
   onAppearanceChange,
   onResetCharacter,
 }: LabScreenProps) {
+  const [projectionView, setProjectionView] = useState<
+    "starting" | "projected"
+  >("projected");
   const changeMetric = (id: MetricId, value: number) => {
     onProgramChange((current) => ({
       ...current,
@@ -186,6 +197,12 @@ export function LabScreen({
       },
     }));
   };
+  const startingDefinition = Math.min(
+    1,
+    Math.max(0, (42 - result.startingBodyFatPct) / 36),
+  );
+  const trainingMetrics = getInputMetrics(TRAINING_INPUT_IDS);
+  const recoveryMetrics = getInputMetrics(RECOVERY_INPUT_IDS);
 
   return (
     <div className="lab-screen screen-enter">
@@ -193,7 +210,7 @@ export function LabScreen({
         <div>
           <span className="eyebrow">Anatomy studio</span>
           <h1>Physique Lab</h1>
-          <p>Inspect the realistic body model and adjust its proportions.</p>
+          <p>Build a starting body, then compare a clear training projection.</p>
         </div>
       </header>
 
@@ -202,17 +219,42 @@ export function LabScreen({
           <header>
             <div>
               <Activity size={13} aria-hidden="true" />
-              Live model
+              Live projection
             </div>
             <span>Drag to inspect</span>
           </header>
 
+          <div className="projection-view-toggle" role="group" aria-label="Character view">
+            <button
+              type="button"
+              className={projectionView === "starting" ? "is-active" : ""}
+              aria-pressed={projectionView === "starting"}
+              onClick={() => setProjectionView("starting")}
+            >
+              Starting body
+            </button>
+            <button
+              type="button"
+              className={projectionView === "projected" ? "is-active" : ""}
+              aria-pressed={projectionView === "projected"}
+              onClick={() => setProjectionView("projected")}
+            >
+              Projected · {result.durationWeeks} weeks
+            </button>
+          </div>
+
           <div className="lab-character">
             <CharacterScene
               profile={profile}
-              growth={result.growth}
-              definition={result.definition}
-              stimulus={result.stimulus}
+              growth={projectionView === "projected" ? result.growth : 0}
+              definition={
+                projectionView === "projected"
+                  ? result.definition
+                  : startingDefinition
+              }
+              stimulus={
+                projectionView === "projected" ? result.stimulus : 0
+              }
               muscleSignals={result.muscleSignals}
               reducedMotion={reducedMotion}
               interactive
@@ -233,16 +275,59 @@ export function LabScreen({
             className="lab-input-variables"
             aria-labelledby="input-variables-title"
           >
-            <h2 id="input-variables-title">Input variables</h2>
+            <h2 id="input-variables-title">Projection inputs</h2>
+            <div className="input-variable-columns">
+              <div className="input-variable-column">
+                <span className="input-variable-column__label">Training</span>
+                {trainingMetrics.map((metric) => (
+                  <InputVariableControl
+                    key={metric.id}
+                    metric={metric}
+                    value={program.values[metric.id]}
+                    onChange={changeMetric}
+                  />
+                ))}
+              </div>
+              <div className="input-variable-column">
+                <span className="input-variable-column__label">Recovery</span>
+                {recoveryMetrics.map((metric) => (
+                  <InputVariableControl
+                    key={metric.id}
+                    metric={metric}
+                    value={program.values[metric.id]}
+                    onChange={changeMetric}
+                  />
+                ))}
+              </div>
+            </div>
+          </section>
+
+          <section className="projection-summary" aria-live="polite">
+            <span>{result.durationWeeks}-week projection</span>
+            <strong>
+              +{result.lowerLeanGainKg.toFixed(1)}–
+              {result.upperLeanGainKg.toFixed(1)} kg
+            </strong>
+            <small>illustrative lean-mass range</small>
             <div>
-              {INPUT_METRICS.map((metric) => (
-                <InputVariableControl
-                  key={metric.id}
-                  metric={metric}
-                  value={program.values[metric.id]}
-                  onChange={changeMetric}
-                />
-              ))}
+              <span>
+                <b>
+                  {profile.measurements.weightKg.toFixed(1)} →{" "}
+                  {result.projectedWeightKg.toFixed(1)}
+                </b>
+                <small>kg body weight</small>
+              </span>
+              <span>
+                <b>
+                  {result.startingBodyFatPct.toFixed(1)} →{" "}
+                  {result.projectedBodyFatPct.toFixed(1)}%
+                </b>
+                <small>body fat</small>
+              </span>
+              <span>
+                <b>{result.proteinPerKg.toFixed(1)}</b>
+                <small>g/kg protein</small>
+              </span>
             </div>
           </section>
         </article>

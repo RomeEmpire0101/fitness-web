@@ -37,6 +37,16 @@ export const CHARACTER_MEASUREMENTS: CharacterMeasurementDefinition[] = [
     step: 1,
     description: "Adds frame mass or regional body fat relative to height",
   },
+  {
+    id: "bodyFatPct",
+    label: "Body fat",
+    shortLabel: "Body fat",
+    unit: "%",
+    min: 6,
+    max: 45,
+    step: 1,
+    description: "Sets the starting fat layer and muscle definition",
+  },
 ];
 
 export const CHARACTER_APPEARANCE_OPTIONS: CharacterAppearanceOption[] = [
@@ -131,12 +141,9 @@ export const DEFAULT_CHARACTER_PROFILE: CharacterProfile = {
   name: "",
   bodyType: "male",
   measurements: {
-    heightCm: Math.round(
-      (CHARACTER_MEASUREMENTS[0].min + CHARACTER_MEASUREMENTS[0].max) / 2,
-    ),
-    weightKg: Math.round(
-      (CHARACTER_MEASUREMENTS[1].min + CHARACTER_MEASUREMENTS[1].max) / 2,
-    ),
+    heightCm: 175,
+    weightKg: 75,
+    bodyFatPct: 18,
   },
   appearance: {
     bodyColor: CHARACTER_APPEARANCE_OPTIONS[0].bodyColor,
@@ -201,6 +208,7 @@ export function normalizeCharacterProfile(
 
   const height = Number(measurements.heightCm);
   const weight = Number(measurements.weightKg);
+  const bodyFat = Number(measurements.bodyFatPct);
   const bodyColor =
     typeof appearance.bodyColor === "string"
       ? appearance.bodyColor
@@ -238,6 +246,12 @@ export function normalizeCharacterProfile(
       weightKg: clampMeasurement(
         "weightKg",
         Number.isFinite(weight) ? weight : fallback.measurements.weightKg,
+      ),
+      bodyFatPct: clampMeasurement(
+        "bodyFatPct",
+        Number.isFinite(bodyFat)
+          ? bodyFat
+          : fallback.measurements.bodyFatPct,
       ),
     },
     appearance: {

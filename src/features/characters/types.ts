@@ -1,6 +1,9 @@
 import type { MuscleGroupId } from "@/lib/simulation";
 
-export type CharacterMeasurementId = "heightCm" | "weightKg";
+export type CharacterMeasurementId =
+  | "heightCm"
+  | "weightKg"
+  | "bodyFatPct";
 
 export type CharacterModelId = "adaptive-athlete";
 

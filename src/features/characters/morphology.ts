@@ -2,10 +2,10 @@ import { CharacterMeasurements } from "./types";
 
 const BASE_HEIGHT_CM = 175;
 const BASE_WEIGHT_KG = 75;
-const BASE_BMI =
-  BASE_WEIGHT_KG / Math.pow(BASE_HEIGHT_CM / 100, 2);
-const FAT_ONSET_BMI = 24.5;
-const HIGH_FAT_BMI = 39;
+const BASE_BODY_FAT = 18;
+const BASE_FFMI =
+  (BASE_WEIGHT_KG * (1 - BASE_BODY_FAT / 100)) /
+  Math.pow(BASE_HEIGHT_CM / 100, 2);
 
 const clamp = (value: number, min: number, max: number) =>
   Math.min(max, Math.max(min, value));
@@ -25,6 +25,7 @@ export type CharacterMorphology = {
   widthScale: number;
   fatLevel: number;
   massIndex: number;
+  fatFreeMassIndex: number;
   groundOffset: number;
   cameraDistance: number;
   buildLabel: "Light" | "Balanced" | "Solid" | "Powerful";
@@ -34,12 +35,9 @@ export type CharacterMorphology = {
  * Converts editable measurements into visual proportions. This is a rendering
  * model only: labels describe the silhouette, not health or body composition.
  *
- * Height controls stature. Weight within a plausible lean range changes frame
- * thickness, while excess height-adjusted mass becomes a separate subcutaneous
- * fat signal. This avoids making the head, hands, and feet uniformly wider.
- *
- * Height and weight cannot distinguish muscle from fat, so fatLevel is a
- * bounded visual heuristic rather than a body-fat estimate or diagnosis.
+ * Height controls stature. Weight and the user's body-fat estimate separate
+ * lean frame mass from the subcutaneous fat layer so a heavier trained body is
+ * not automatically rendered as a higher-fat body.
  */
 export function deriveCharacterMorphology(
   measurements: CharacterMeasurements,
@@ -47,29 +45,28 @@ export function deriveCharacterMorphology(
   const heightScale = clamp(measurements.heightCm / BASE_HEIGHT_CM, 0.82, 1.22);
   const heightMeters = measurements.heightCm / 100;
   const massIndex = measurements.weightKg / Math.pow(heightMeters, 2);
+  const bodyFatFraction = measurements.bodyFatPct / 100;
+  const leanMass = measurements.weightKg * (1 - bodyFatFraction);
+  const fatFreeMassIndex = leanMass / Math.pow(heightMeters, 2);
 
-  // Structural width grows only through the plausible lean-mass range. Mass
-  // above that range is handled by regional fat deformation in the shader.
-  const structuralBmi = clamp(massIndex, 17, 25.5);
+  // Structural width follows fat-free mass relative to height. Fat has its own
+  // regional deformation path in the anatomy shaders.
+  const structuralFfmi = clamp(fatFreeMassIndex, 13.5, 26);
   const widthScale = clamp(
-    Math.sqrt(structuralBmi / BASE_BMI),
+    Math.sqrt(structuralFfmi / BASE_FFMI),
     0.83,
-    1.025,
+    1.13,
   );
 
-  // A broad, eased transition prevents a one-kilogram change from visibly
-  // switching the body between "lean" and "fat." Very high values continue
-  // adding volume at a reduced rate so the 150 kg editor limit remains useful.
-  const primaryFat = smootherstep(FAT_ONSET_BMI, HIGH_FAT_BMI, massIndex);
-  const highMassContinuation = clamp(
-    (massIndex - HIGH_FAT_BMI) / 44,
+  const fatLevel = clamp(
+    smootherstep(8, 40, measurements.bodyFatPct) +
+      clamp((measurements.bodyFatPct - 40) / 25, 0, 0.18),
     0,
-    0.28,
+    1.18,
   );
-  const fatLevel = clamp(primaryFat + highMassContinuation, 0, 1.28);
 
   const buildLabel: CharacterMorphology["buildLabel"] =
-    massIndex < 18.5
+    fatFreeMassIndex < 16
       ? "Light"
       : fatLevel < 0.18
         ? "Balanced"
@@ -82,6 +79,7 @@ export function deriveCharacterMorphology(
     widthScale,
     fatLevel,
     massIndex,
+    fatFreeMassIndex,
     groundOffset: (heightScale - 1) * 2.49,
     cameraDistance:
       10.35 +
