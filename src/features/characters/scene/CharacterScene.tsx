@@ -1,7 +1,7 @@
 "use client";
 
 import { ContactShadows, OrbitControls } from "@react-three/drei";
-import { Canvas, useFrame } from "@react-three/fiber";
+import { Canvas } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { deriveCharacterMorphology } from "../morphology";
@@ -18,42 +18,37 @@ export type CharacterSceneProps = CharacterVisualization & {
   interactive?: boolean;
 };
 
-function AdaptiveCamera({
-  profile,
-  compact,
-}: {
-  profile: CharacterProfile;
-  compact: boolean;
-}) {
-  const morphology = useMemo(
-    () => deriveCharacterMorphology(profile.measurements),
-    [profile.measurements],
-  );
-
-  useFrame(({ camera }, delta) => {
-    camera.position.z = THREE.MathUtils.damp(
-      camera.position.z,
-      morphology.cameraDistance + (compact ? 0.7 : 0),
-      5,
-      delta,
-    );
-  });
-
-  return null;
-}
-
 export default function CharacterScene(props: CharacterSceneProps) {
   const compact = props.compact ?? false;
   const interactive = props.interactive ?? true;
+  const morphology = useMemo(
+    () => deriveCharacterMorphology(props.profile.measurements),
+    [props.profile.measurements],
+  );
+  const cameraDistance =
+    morphology.cameraDistance + (compact ? 0.7 : 0);
+  const camera = useMemo(
+    () => ({
+      position: [0, compact ? 0.16 : 0.13, cameraDistance] as [
+        number,
+        number,
+        number,
+      ],
+      fov: compact ? 34 : 32,
+    }),
+    [cameraDistance, compact],
+  );
 
   return (
     <Canvas
-      aria-hidden="true"
+      aria-label={
+        interactive
+          ? "Interactive 3D physique. Drag to rotate all the way around the character and scroll to zoom."
+          : "3D physique preview"
+      }
+      role="img"
       dpr={[1, 1.75]}
-      camera={{
-        position: [0, compact ? 0.16 : 0.13, compact ? 10.8 : 10.3],
-        fov: compact ? 34 : 32,
-      }}
+      camera={camera}
       shadows
       gl={{
         antialias: true,
@@ -67,7 +62,6 @@ export default function CharacterScene(props: CharacterSceneProps) {
         </div>
       }
     >
-      <AdaptiveCamera profile={props.profile} compact={compact} />
       <SceneLighting />
       <RegisteredCharacterModel {...props} />
       <ContactShadows
@@ -82,10 +76,16 @@ export default function CharacterScene(props: CharacterSceneProps) {
         <OrbitControls
           makeDefault
           enablePan={false}
-          enableZoom={false}
+          enableZoom
+          minDistance={cameraDistance * 0.62}
+          maxDistance={cameraDistance * 1.65}
           minPolarAngle={Math.PI / 2 - 0.22}
           maxPolarAngle={Math.PI / 2 + 0.22}
-          rotateSpeed={0.46}
+          minAzimuthAngle={-Infinity}
+          maxAzimuthAngle={Infinity}
+          rotateSpeed={0.58}
+          zoomSpeed={0.72}
+          zoomToCursor
           dampingFactor={0.06}
           enableDamping
           target={[0, 0.05, 0]}

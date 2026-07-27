@@ -329,7 +329,7 @@ export function LabScreen({
               <Activity size={13} aria-hidden="true" />
               Live projection
             </div>
-            <span>Drag to inspect</span>
+            <span>Drag 360° · Scroll to zoom</span>
           </header>
 
           <div
@@ -355,7 +355,11 @@ export function LabScreen({
             </button>
           </div>
 
-          <div className="lab-character">
+          <div
+            className="lab-character"
+            aria-label="3D character projection box"
+            data-projection-box
+          >
             <CharacterScene
               profile={profile}
               growth={projectionView === "projected" ? result.growth : 0}
