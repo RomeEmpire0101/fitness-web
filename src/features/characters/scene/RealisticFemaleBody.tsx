@@ -33,6 +33,7 @@ function injectFemaleAnatomyShader(
         uniform float uShoulders;
         uniform float uBiceps;
         uniform float uTriceps;
+        uniform float uForearms;
         uniform float uCore;
         uniform float uQuads;
         uniform float uHamstrings;
@@ -65,16 +66,18 @@ function injectFemaleAnatomyShader(
         float chestMask = femaleBand(position.y, 0.47, 1.2, 0.22) *
           front * torso;
         float upperBackMask = femaleBand(position.y, 0.58, 1.52, 0.24) *
-          rearBias * (1.0 - smoothstep(0.86, 1.12, ax));
+          rearBias * (1.0 - smoothstep(0.67, 0.81, ax));
         float latMask = femaleBand(position.y, 0.18, 1.14, 0.3) *
-          femaleBand(ax, 0.2, 0.8, 0.2) * (0.32 + rear * 0.68);
+          femaleBand(ax, 0.18, 0.68, 0.18) * (0.32 + rear * 0.68);
         float backMask = max(upperBackMask, latMask);
         float shoulderMask = femaleBand(position.y, 0.78, 1.45, 0.2) *
           femaleBand(ax, 0.36, 0.88, 0.18);
-        float bicepsMask = femaleBand(position.y, 0.08, 1.05, 0.25) *
-          arms * front;
+        float bicepsMask = femaleBand(position.y, 0.28, 1.08, 0.23) *
+          upperArms * front;
         float tricepsMask = femaleBand(position.y, 0.26, 1.1, 0.23) *
           upperArms * rear;
+        float forearmMask = femaleBand(position.y, -0.48, 0.42, 0.2) *
+          arms;
         float coreMask = femaleBand(position.y, -0.3, 0.69, 0.24) *
           torso * front;
         float gluteMask = femaleBand(position.y, -0.86, 0.16, 0.3) *
@@ -97,6 +100,8 @@ function injectFemaleAnatomyShader(
           anatomySignal(uBiceps) * bicepsMask * 0.017;
         float tricepsExpansion =
           anatomySignal(uTriceps) * tricepsMask * 0.01;
+        float forearmExpansion =
+          anatomySignal(uForearms) * forearmMask * 0.017;
         float coreExpansion =
           anatomySignal(uCore) * coreMask * 0.035;
         float gluteExpansion =
@@ -114,7 +119,10 @@ function injectFemaleAnatomyShader(
           max(chestExpansion, backExpansion),
           max(
             max(shoulderExpansion, bicepsExpansion),
-            max(tricepsExpansion, coreExpansion)
+            max(
+              tricepsExpansion,
+              max(forearmExpansion, coreExpansion)
+            )
           )
         );
         float lowerExpansion = max(
@@ -185,7 +193,10 @@ function injectFemaleAnatomyShader(
               ),
               max(
                 anatomySignal(uHamstrings) * hamstringMask * 0.04,
-                anatomySignal(uCalves) * calfMask * 0.022
+                max(
+                  anatomySignal(uCalves) * calfMask * 0.022,
+                  anatomySignal(uForearms) * forearmMask * 0.018
+                )
               )
             )
           ),
@@ -207,7 +218,10 @@ function injectFemaleAnatomyShader(
                 anatomySignal(uQuads) * quadMask * 0.038,
                 max(
                   anatomySignal(uHamstrings) * hamstringMask * 0.038,
-                  anatomySignal(uCalves) * calfMask * 0.02
+                  max(
+                    anatomySignal(uCalves) * calfMask * 0.02,
+                    anatomySignal(uForearms) * forearmMask * 0.02
+                  )
                 )
               )
             )
@@ -248,15 +262,31 @@ function injectFemaleAnatomyShader(
       .replace(
         "#include <common>",
         `#include <common>
+        uniform float uGrowth;
         uniform float uDefinition;
         uniform float uStimulus;
         uniform float uFat;
+        uniform float uChest;
+        uniform float uBack;
+        uniform float uShoulders;
+        uniform float uBiceps;
+        uniform float uTriceps;
+        uniform float uForearms;
+        uniform float uCore;
+        uniform float uQuads;
+        uniform float uHamstrings;
+        uniform float uGlutes;
+        uniform float uCalves;
         uniform vec3 uStimulusColor;
         varying vec3 vFemaleAnatomyPosition;
 
         float femaleBand(float value, float low, float high, float fade) {
           return smoothstep(low, low + fade, value) *
             (1.0 - smoothstep(high - fade, high, value));
+        }
+
+        float femaleFragmentSignal(float value) {
+          return clamp(value, 0.0, 1.0);
         }`,
       )
       .replace(
@@ -275,6 +305,7 @@ function injectFemaleAnatomyShader(
         );
         float torsoCenter = 1.0 - smoothstep(0.38, 0.69, anatomyX);
         float anatomyArms = femaleBand(anatomyX, 0.52, 1.14, 0.2);
+        float upperArms = femaleBand(anatomyX, 0.58, 1.1, 0.18);
         float anatomyLegs = femaleBand(anatomyX, 0.08, 0.66, 0.17);
         float chestArea = femaleBand(
           vFemaleAnatomyPosition.y,
@@ -282,17 +313,44 @@ function injectFemaleAnatomyShader(
           1.2,
           0.22
         ) * anatomyFront * torsoCenter;
-        float backArea = femaleBand(
+        float upperBackArea = femaleBand(
           vFemaleAnatomyPosition.y,
-          0.35,
-          1.31,
-          0.26
-        ) * anatomyRear;
-        float armArea = femaleBand(
-          vFemaleAnatomyPosition.y,
-          0.08,
-          1.08,
+          0.58,
+          1.5,
           0.24
+        ) * anatomyRear *
+          (1.0 - smoothstep(0.67, 0.81, anatomyX));
+        float latArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          0.18,
+          1.14,
+          0.3
+        ) * femaleBand(anatomyX, 0.18, 0.68, 0.18) *
+          (0.32 + anatomyRear * 0.68);
+        float backArea = max(upperBackArea, latArea);
+        float shoulderArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          0.78,
+          1.45,
+          0.2
+        ) * femaleBand(anatomyX, 0.36, 0.88, 0.18);
+        float bicepsArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          0.28,
+          1.08,
+          0.23
+        ) * upperArms * anatomyFront;
+        float tricepsArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          0.26,
+          1.1,
+          0.23
+        ) * upperArms * anatomyRear;
+        float forearmArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          -0.48,
+          0.42,
+          0.2
         ) * anatomyArms;
         float coreArea = femaleBand(
           vFemaleAnatomyPosition.y,
@@ -300,12 +358,25 @@ function injectFemaleAnatomyShader(
           0.69,
           0.23
         ) * anatomyFront * torsoCenter;
-        float thighArea = femaleBand(
+        float gluteArea = femaleBand(
           vFemaleAnatomyPosition.y,
-          -1.48,
-          -0.1,
-          0.28
-        ) * anatomyLegs;
+          -0.86,
+          0.16,
+          0.3
+        ) * (1.0 - smoothstep(0.72, 0.96, anatomyX)) *
+          (0.2 + anatomyRear * 0.8);
+        float quadArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          -1.62,
+          -0.06,
+          0.32
+        ) * anatomyLegs * (0.32 + anatomyFront * 0.68);
+        float hamstringArea = femaleBand(
+          vFemaleAnatomyPosition.y,
+          -1.62,
+          -0.06,
+          0.32
+        ) * anatomyLegs * (0.32 + anatomyRear * 0.68);
         float calfArea = femaleBand(
           vFemaleAnatomyPosition.y,
           -2.2,
@@ -320,22 +391,103 @@ function injectFemaleAnatomyShader(
         float diagonalFibers = 0.5 + 0.5 * sin(
           (vFemaleAnatomyPosition.y + anatomyX * 0.38) * 96.0
         );
-        float fiber =
+        float horizontalFibers = 0.5 + 0.5 * sin(
+          vFemaleAnatomyPosition.x * 112.0 +
+          vFemaleAnatomyPosition.y * 15.0
+        );
+        float baseFiber =
           pow(diagonalFibers, 15.0) * (chestArea + backArea) +
           pow(longFibers, 16.0) *
-            (armArea + coreArea * 0.58 + thighArea + calfArea);
+            (
+              bicepsArea + tricepsArea + forearmArea +
+              coreArea * 0.58 + quadArea + hamstringArea + calfArea
+            );
+
+        float chestSignal = femaleFragmentSignal(uChest) * chestArea;
+        float backSignal = femaleFragmentSignal(uBack) * backArea;
+        float shoulderSignal =
+          femaleFragmentSignal(uShoulders) * shoulderArea;
+        float bicepsSignal = femaleFragmentSignal(uBiceps) * bicepsArea;
+        float tricepsSignal =
+          femaleFragmentSignal(uTriceps) * tricepsArea;
+        float forearmSignal =
+          femaleFragmentSignal(uForearms) * forearmArea;
+        float coreSignal = femaleFragmentSignal(uCore) * coreArea;
+        float quadSignal = femaleFragmentSignal(uQuads) * quadArea;
+        float hamstringSignal =
+          femaleFragmentSignal(uHamstrings) * hamstringArea;
+        float gluteSignal = femaleFragmentSignal(uGlutes) * gluteArea;
+        float calfSignal = femaleFragmentSignal(uCalves) * calfArea;
+        float regionalSignal = max(
+          max(
+            max(chestSignal, backSignal),
+            max(shoulderSignal, bicepsSignal)
+          ),
+          max(
+            max(tricepsSignal, forearmSignal),
+            max(
+              max(coreSignal, quadSignal),
+              max(
+                max(hamstringSignal, gluteSignal),
+                calfSignal
+              )
+            )
+          )
+        );
+
+        float horizontalStriations = pow(horizontalFibers, 9.0);
+        float longStriations = pow(longFibers, 10.0);
+        float diagonalStriations = pow(diagonalFibers, 9.0);
+        float striatedFiber = max(
+          max(
+            horizontalStriations * chestSignal,
+            diagonalStriations *
+              (backSignal + shoulderSignal + gluteSignal)
+          ),
+          longStriations * (
+            bicepsSignal + tricepsSignal + forearmSignal +
+            coreSignal + quadSignal + hamstringSignal + calfSignal
+          )
+        );
+        float striationRidge = max(
+          max(
+            pow(1.0 - horizontalFibers, 14.0) * chestSignal,
+            pow(1.0 - diagonalFibers, 14.0) *
+              (backSignal + shoulderSignal + gluteSignal)
+          ),
+          pow(1.0 - longFibers, 15.0) * (
+            bicepsSignal + tricepsSignal + forearmSignal +
+            coreSignal + quadSignal + hamstringSignal + calfSignal
+          )
+        );
         float muscleSurface = clamp(
-          chestArea + backArea + armArea + coreArea + thighArea + calfArea,
+          chestArea + backArea + shoulderArea + bicepsArea + tricepsArea +
+          forearmArea + coreArea + quadArea + hamstringArea +
+          gluteArea + calfArea,
           0.0,
           1.0
         );
         float surfaceDefinition = uDefinition * (
           1.0 - clamp(uFat * 0.84, 0.0, 0.94)
         );
+        float lowFatReveal =
+          smoothstep(0.7, 0.96, uDefinition) *
+          (1.0 - smoothstep(0.04, 0.38, uFat));
+        float growthReveal = smoothstep(
+          0.12,
+          0.72,
+          femaleFragmentSignal(uGrowth) * regionalSignal
+        );
+        float striationVisibility = lowFatReveal * growthReveal;
         float visibleStimulus = uStimulus * (
           1.0 - clamp(uFat * 0.68, 0.0, 0.84)
         );
-        diffuseColor.rgb *= 1.0 - fiber * surfaceDefinition * 0.021;
+        diffuseColor.rgb *=
+          1.0 -
+          baseFiber * surfaceDefinition * 0.022 -
+          striatedFiber * striationVisibility * 0.135;
+        diffuseColor.rgb *=
+          1.0 + striationRidge * striationVisibility * 0.032;
         diffuseColor.rgb = mix(
           diffuseColor.rgb,
           uStimulusColor,
@@ -344,7 +496,7 @@ function injectFemaleAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-female-anatomy-v4";
+  material.customProgramCacheKey = () => "realistic-female-anatomy-v5";
 }
 
 function createFemaleSkinMaterial(

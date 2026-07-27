@@ -43,6 +43,10 @@ for (const body of bodies) {
   const source = await fs.readFile(new URL(body.source, root), "utf8");
   const requiredGuards = [
     "float anatomySignal(float value)",
+    "uniform float uForearms;",
+    "float forearmMask",
+    "float regionalSignal = max(",
+    "float striationVisibility",
     "float upperExpansion = max(",
     "float lowerExpansion = max(",
     "float muscleDisplacement = clamp(",
@@ -77,6 +81,27 @@ assert(
 assert(
   !characterModel.includes(".scale.set(1, height, 1)"),
   "Vertical-only character scaling can create distorted short profiles",
+);
+assert(
+  characterModel.includes("anatomy.uForearms.value = damp("),
+  "Forearm growth must be animated with the other regional signals",
+);
+
+const simulation = await fs.readFile(
+  new URL("src/lib/simulation.ts", root),
+  "utf8",
+);
+assert(
+  !simulation.includes("TARGET_SYNERGIES[target][muscle.id] ?? 0.06"),
+  "Non-synergist muscles must not receive phantom growth",
+);
+assert(
+  simulation.includes("back: { shoulders: 0.25, biceps: 0.4, forearms: 0.55 }"),
+  "Back training must include grip-driven forearm carryover",
+);
+assert(
+  simulation.includes("forearms: { back: 0.25, biceps: 0.35 }"),
+  "Forearms must remain an independently targetable muscle group",
 );
 
 console.log("Anatomy deformation safety checks passed.");

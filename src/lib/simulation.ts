@@ -34,6 +34,7 @@ export type MuscleGroupId =
   | "shoulders"
   | "biceps"
   | "triceps"
+  | "forearms"
   | "core"
   | "quads"
   | "hamstrings"
@@ -349,6 +350,7 @@ export const MUSCLE_GROUPS: MuscleDefinition[] = [
   { id: "shoulders", label: "Shoulders", shortLabel: "Delts", color: "#9f75db" },
   { id: "biceps", label: "Biceps", shortLabel: "Biceps", color: "#e88b63" },
   { id: "triceps", label: "Triceps", shortLabel: "Triceps", color: "#dc6f74" },
+  { id: "forearms", label: "Forearms", shortLabel: "Forearms", color: "#bd8068" },
   { id: "core", label: "Core", shortLabel: "Core", color: "#38a68a" },
   { id: "quads", label: "Quadriceps", shortLabel: "Quads", color: "#d6a23d" },
   { id: "hamstrings", label: "Hamstrings", shortLabel: "Hams", color: "#c98c42" },
@@ -366,10 +368,11 @@ const TARGET_SYNERGIES: Record<
   Partial<Record<MuscleGroupId, number>>
 > = {
   chest: { shoulders: 0.3, triceps: 0.35 },
-  back: { shoulders: 0.25, biceps: 0.4 },
+  back: { shoulders: 0.25, biceps: 0.4, forearms: 0.55 },
   shoulders: { chest: 0.15, back: 0.15, triceps: 0.3 },
-  biceps: { back: 0.25 },
+  biceps: { back: 0.25, forearms: 0.45 },
   triceps: { chest: 0.22, shoulders: 0.22 },
+  forearms: { back: 0.25, biceps: 0.35 },
   core: { back: 0.1 },
   quads: { glutes: 0.3, calves: 0.12 },
   hamstrings: { glutes: 0.4, calves: 0.12 },
@@ -509,7 +512,7 @@ export function derivePhysique(
       ...program.targetMuscles.map((target) =>
         muscle.id === target
           ? 1
-          : TARGET_SYNERGIES[target][muscle.id] ?? 0.06,
+          : TARGET_SYNERGIES[target][muscle.id] ?? 0,
       ),
     );
     return signals;

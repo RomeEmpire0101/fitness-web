@@ -56,6 +56,7 @@ export function CharacterModel({
       uShoulders: { value: muscleSignals?.shoulders ?? growth },
       uBiceps: { value: muscleSignals?.biceps ?? growth },
       uTriceps: { value: muscleSignals?.triceps ?? growth },
+      uForearms: { value: muscleSignals?.forearms ?? growth },
       uCore: { value: muscleSignals?.core ?? growth },
       uQuads: { value: muscleSignals?.quads ?? growth },
       uHamstrings: { value: muscleSignals?.hamstrings ?? growth },
@@ -154,6 +155,12 @@ export function CharacterModel({
     anatomy.uTriceps.value = damp(
       anatomy.uTriceps.value,
       signal("triceps"),
+      5,
+      delta,
+    );
+    anatomy.uForearms.value = damp(
+      anatomy.uForearms.value,
+      signal("forearms"),
       5,
       delta,
     );
