@@ -121,7 +121,10 @@ export function CharacterModel({
         groundOffset +
         (reducedMotion ? 0 : Math.sin(elapsed * 1.68) * 0.005);
     }
-    bodyScale.current?.scale.set(1, height, 1);
+    // Stature must scale the whole body uniformly. Scaling only the vertical
+    // axis makes shorter profiles unnaturally squat and amplifies every
+    // regional muscle deformation relative to their height.
+    bodyScale.current?.scale.set(height, height, height);
     if (breath.current) {
       breath.current.scale.x = 1 + inhale * 0.0015;
       breath.current.scale.z = 1 + inhale * 0.006;

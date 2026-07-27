@@ -1,0 +1,14 @@
+{
+  "male": {
+    "maxNormalDisplacement": 0.082,
+    "maxTotalNormalDisplacement": 0.13,
+    "maxLateralScale": 0.055,
+    "maxDepthScale": 0.055
+  },
+  "female": {
+    "maxNormalDisplacement": 0.078,
+    "maxTotalNormalDisplacement": 0.13,
+    "maxLateralScale": 0.052,
+    "maxDepthScale": 0.052
+  }
+}
