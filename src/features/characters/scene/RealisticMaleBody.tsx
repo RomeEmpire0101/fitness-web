@@ -109,115 +109,139 @@ function injectAnatomyShader(
           uHamstrings * hamstringMask * 0.057 +
           uCalves * calfMask * 0.052;
 
-        // Body presentation changes regional frame proportions without changing
-        // the shared height/weight calculation.
-        float shoulderFrame = anatomyBand(position.y, 0.78, 1.48, 0.18) *
-          anatomyBand(ax, 0.34, 1.02, 0.2);
-        float waistFrame = anatomyBand(position.y, -0.28, 0.62, 0.2) *
-          (1.0 - smoothstep(0.64, 0.86, ax));
-        float hipFrame = anatomyBand(position.y, -0.72, 0.08, 0.18) *
-          (1.0 - smoothstep(0.7, 0.9, ax));
-        float thighFrame = anatomyBand(position.y, -1.48, -0.2, 0.24) *
-          legZone;
-        float feminineXScale =
-          1.0 -
-          shoulderFrame * 0.075 -
-          waistFrame * 0.07 +
-          hipFrame * 0.12 +
-          thighFrame * 0.055;
-        transformed.x *= mix(1.0, feminineXScale, uFeminine);
-        float feminineChestShape =
-          anatomyBand(position.y, 0.45, 1.14, 0.18) *
-          front *
-          (1.0 - smoothstep(0.38, 0.64, ax));
-        transformed += objectNormal *
-          feminineChestShape *
-          uFeminine *
-          0.075;
-
-        // Fat is intentionally regional rather than a global scale. The signal
-        // is identical for both presentations; only the distribution changes.
-        float torsoZone = 1.0 - smoothstep(0.58, 0.82, ax);
-        float sideFacing = smoothstep(0.35, 0.88, abs(objectNormal.x));
-        float abdomenFat = anatomyBand(position.y, -0.5, 0.72, 0.22) *
-          front * torsoZone;
-        float lowerBellyFat = anatomyBand(position.y, -0.58, 0.18, 0.18) *
-          front * torsoZone;
-        float flankFat = anatomyBand(position.y, -0.48, 0.62, 0.2) *
-          anatomyBand(ax, 0.3, 0.72, 0.14) * sideFacing;
-        float lowerBackFat = anatomyBand(position.y, -0.48, 0.5, 0.2) *
-          rear * (1.0 - smoothstep(0.65, 0.85, ax));
-        float chestFat = anatomyBand(position.y, 0.5, 1.25, 0.22) *
-          front * centerTorso;
-        float upperBackFat = anatomyBand(position.y, 0.45, 1.2, 0.25) *
-          rear * (1.0 - smoothstep(0.7, 0.95, ax));
-        float neckFat = anatomyBand(position.y, 1.38, 1.82, 0.12) *
-          (1.0 - smoothstep(0.22, 0.42, ax));
-        float jawFat = anatomyBand(position.y, 1.65, 1.92, 0.1) *
-          front * (1.0 - smoothstep(0.18, 0.38, ax));
-        float armFat = anatomyBand(position.y, 0.05, 1.1, 0.24) * armZone;
-        float gluteFat = anatomyBand(position.y, -0.5, 0.2, 0.2) *
-          legZone * rear;
-        float thighFat = anatomyBand(position.y, -1.45, -0.12, 0.25) *
-          legZone;
-        float calfFat = anatomyBand(position.y, -2.18, -1.06, 0.22) *
-          legZone;
-        float maleFatExpansion =
-          abdomenFat * 0.16 +
-          lowerBellyFat * 0.11 +
-          flankFat * 0.14 +
-          lowerBackFat * 0.09 +
-          chestFat * 0.075 +
-          upperBackFat * 0.065 +
-          neckFat * 0.04 +
-          jawFat * 0.03 +
-          armFat * 0.055 +
-          gluteFat * 0.115 +
-          thighFat * 0.085 +
-          calfFat * 0.025;
-        float femaleLowerAbdomen = anatomyBand(
-          position.y,
-          -0.62,
-          0.22,
-          0.18
-        ) * front * torsoZone;
-        float femaleWaist = anatomyBand(position.y, -0.38, 0.45, 0.2) *
-          anatomyBand(ax, 0.24, 0.68, 0.14) * sideFacing;
-        float femaleHip = anatomyBand(position.y, -0.72, 0.08, 0.18) *
-          (1.0 - smoothstep(0.78, 0.98, ax));
-        float femaleGlute = anatomyBand(position.y, -0.72, 0.1, 0.18) *
-          legZone * rear;
-        float femaleThigh = anatomyBand(position.y, -1.55, -0.1, 0.24) *
-          legZone;
-        float femaleChest = anatomyBand(position.y, 0.43, 1.2, 0.2) *
-          front * centerTorso;
-        float femaleUpperArm = anatomyBand(position.y, 0.08, 1.05, 0.22) *
+        // Broad overlapping envelopes produce a continuous subcutaneous layer.
+        // Regional masks then bias where volume accumulates without creating
+        // isolated spheres or sharp seams between adjacent body areas.
+        float trunkEnvelope = anatomyBand(position.y, -0.82, 1.34, 0.42) *
+          (1.0 - smoothstep(0.7, 0.98, ax));
+        float upperArmEnvelope = anatomyBand(position.y, -0.02, 1.18, 0.34) *
           armZone;
+        float hipEnvelope = anatomyBand(position.y, -0.82, 0.16, 0.34) *
+          (1.0 - smoothstep(0.76, 1.0, ax));
+        float thighEnvelope = anatomyBand(position.y, -1.62, -0.06, 0.4) *
+          legZone;
+        float calfEnvelope = anatomyBand(position.y, -2.28, -0.98, 0.34) *
+          legZone;
+        float neckEnvelope = anatomyBand(position.y, 1.32, 1.84, 0.2) *
+          (1.0 - smoothstep(0.24, 0.46, ax));
+        float jawEnvelope = anatomyBand(position.y, 1.64, 1.98, 0.16) *
+          front * (1.0 - smoothstep(0.18, 0.4, ax));
+        float sideFacing = smoothstep(0.28, 0.82, abs(objectNormal.x));
+
+        float abdomen = anatomyBand(position.y, -0.28, 0.76, 0.38) *
+          (1.0 - smoothstep(0.64, 0.88, ax));
+        float lowerAbdomen = anatomyBand(position.y, -0.34, 0.34, 0.28) *
+          front * (1.0 - smoothstep(0.62, 0.86, ax));
+        float flank = anatomyBand(position.y, -0.3, 0.64, 0.34) *
+          anatomyBand(ax, 0.22, 0.74, 0.22) * sideFacing;
+        float lowerBack = anatomyBand(position.y, -0.32, 0.54, 0.32) *
+          rear * (1.0 - smoothstep(0.72, 0.94, ax));
+        float chestAdipose = anatomyBand(position.y, 0.42, 1.26, 0.3) *
+          front * centerTorso;
+        float upperBackAdipose = anatomyBand(position.y, 0.38, 1.24, 0.34) *
+          rear * (1.0 - smoothstep(0.72, 0.98, ax));
+        float gluteAdipose = anatomyBand(position.y, -0.76, 0.12, 0.32) *
+          legZone * rear;
+
+        float commonSubcutaneous =
+          trunkEnvelope * 0.024 +
+          upperArmEnvelope * 0.018 +
+          calfEnvelope * 0.01 +
+          neckEnvelope * 0.01 +
+          jawEnvelope * 0.006;
+        float maleSubcutaneous =
+          commonSubcutaneous +
+          thighEnvelope * 0.005;
+        float femaleSubcutaneous =
+          commonSubcutaneous +
+          hipEnvelope * 0.018 +
+          thighEnvelope * 0.022;
+
+        float maleMidsection = max(
+          max(abdomen * 0.12, lowerAbdomen * 0.14),
+          max(flank * 0.108, lowerBack * 0.078)
+        );
+        float maleFatExpansion =
+          maleSubcutaneous +
+          maleMidsection +
+          chestAdipose * 0.035 +
+          upperBackAdipose * 0.028 +
+          gluteAdipose * 0.01;
+
+        float femaleWaist = anatomyBand(position.y, -0.42, 0.48, 0.34) *
+          anatomyBand(ax, 0.18, 0.7, 0.2) * sideFacing;
+        float femaleLowerBody = max(
+          max(hipEnvelope * 0.034, gluteAdipose * 0.038),
+          thighEnvelope * 0.032
+        );
+        float femaleTorso = max(
+          lowerAbdomen * 0.052,
+          femaleWaist * 0.042
+        );
         float femaleFatExpansion =
-          femaleLowerAbdomen * 0.105 +
-          femaleWaist * 0.085 +
-          lowerBackFat * 0.07 +
-          femaleHip * 0.15 +
-          femaleGlute * 0.17 +
-          femaleThigh * 0.135 +
-          femaleChest * 0.095 +
-          femaleUpperArm * 0.065 +
-          calfFat * 0.025 +
-          jawFat * 0.022;
-        float fatExpansion = mix(
-          maleFatExpansion,
-          femaleFatExpansion,
-          uFeminine
+          femaleSubcutaneous +
+          femaleLowerBody +
+          femaleTorso +
+          chestAdipose * 0.032 +
+          upperBackAdipose * 0.024 +
+          lowerBack * 0.03;
+        float fatExpansion = clamp(
+          mix(maleFatExpansion, femaleFatExpansion, uFeminine),
+          0.0,
+          0.2
         );
         float muscleVisibility = mix(
           1.0,
-          0.72,
-          clamp(uFat * 0.75, 0.0, 1.0)
+          0.58,
+          clamp(uFat * 0.78, 0.0, 1.0)
         );
         transformed += objectNormal * (
           expansion * uGrowth * muscleVisibility +
           fatExpansion * uFat
         );
+
+        float maleCentralScale = anatomyBand(
+          position.y,
+          -0.3,
+          0.84,
+          0.44
+        ) * (1.0 - smoothstep(0.7, 0.95, ax));
+        float femaleTrunkScale = anatomyBand(
+          position.y,
+          -0.76,
+          0.8,
+          0.48
+        ) * (1.0 - smoothstep(0.74, 0.98, ax));
+        float femaleHipScale = anatomyBand(
+          position.y,
+          -0.88,
+          0.1,
+          0.38
+        ) * (1.0 - smoothstep(0.78, 1.0, ax));
+        float femaleThighScale = anatomyBand(
+          position.y,
+          -1.58,
+          -0.08,
+          0.42
+        ) * legZone;
+        float fatXScale = mix(
+          maleCentralScale * 0.18 -
+            hipEnvelope * 0.1 -
+            thighEnvelope * 0.05,
+          femaleTrunkScale * 0.06 +
+            femaleHipScale * 0.025 +
+            femaleThighScale * 0.014,
+          uFeminine
+        );
+        float fatZScale = mix(
+          maleCentralScale * 0.24,
+          femaleTrunkScale * 0.12 +
+            femaleHipScale * 0.03 +
+            femaleThighScale * 0.01,
+          uFeminine
+        );
+        transformed.x *= 1.0 + uFat * fatXScale;
+        transformed.z *= 1.0 + uFat * fatZScale;
 
         float bodyWidthMask = 1.0 - smoothstep(1.48, 1.96, position.y);
         float extremityMask =
@@ -286,10 +310,10 @@ function injectAnatomyShader(
           1.0
         );
         float surfaceDefinition = uDefinition * (
-          1.0 - clamp(uFat * 0.72, 0.0, 0.88)
+          1.0 - clamp(uFat * 0.82, 0.0, 0.92)
         );
         float visibleStimulus = uStimulus * (
-          1.0 - clamp(uFat * 0.55, 0.0, 0.75)
+          1.0 - clamp(uFat * 0.65, 0.0, 0.82)
         );
         diffuseColor.rgb *= 1.0 - fiber * surfaceDefinition * 0.028;
         diffuseColor.rgb = mix(
@@ -300,12 +324,13 @@ function injectAnatomyShader(
       );
   };
 
-  material.customProgramCacheKey = () => "realistic-body-anatomy-v4";
+  material.customProgramCacheKey = () => "realistic-body-anatomy-v11";
 }
 
 function createSkinMaterial(
   appearance: CharacterAppearance,
   anatomy: AnatomyUniforms,
+  bodyType: CharacterBodyType,
 ) {
   const base = new THREE.Color(appearance.bodyColor);
   const material = new THREE.MeshPhysicalMaterial({
@@ -319,6 +344,7 @@ function createSkinMaterial(
     sheenRoughness: 0.82,
     envMapIntensity: 0.72,
   });
+  material.name = `${bodyType}-skin`;
   injectAnatomyShader(material, anatomy);
   return material;
 }
@@ -328,10 +354,14 @@ export function RealisticBody({
   bodyType,
   anatomy,
 }: RealisticBodyProps) {
-  const { scene } = useGLTF("/models/male-base.glb");
+  const modelPath =
+    bodyType === "female"
+      ? "/models/female-base.glb"
+      : "/models/male-base.glb";
+  const { scene } = useGLTF(modelPath);
   const skinMaterial = useMemo(
-    () => createSkinMaterial(appearance, anatomy),
-    [anatomy, appearance],
+    () => createSkinMaterial(appearance, anatomy, bodyType),
+    [anatomy, appearance, bodyType],
   );
   const model = useMemo(() => scene.clone(true), [scene]);
 
@@ -356,13 +386,11 @@ export function RealisticBody({
   }, [model, skinMaterial]);
 
   return (
-    <group
-      dispose={null}
-      scale={[bodyType === "female" ? 0.985 : 1, 1, 1]}
-    >
+    <group dispose={null}>
       <primitive object={model} />
     </group>
   );
 }
 
 useGLTF.preload("/models/male-base.glb");
+useGLTF.preload("/models/female-base.glb");

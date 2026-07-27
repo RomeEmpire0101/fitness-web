@@ -1,0 +1,17 @@
+Female human base mesh
+
+This mesh is a vertex-level anatomical derivative of male-base.glb, created for
+the FormForge character visualizer. It preserves the original topology while
+using a distinct female silhouette with a narrower shoulder and waist frame,
+wider pelvis and thighs, and separately modeled chest and glute contours.
+
+Original source:
+https://commons.wikimedia.org/wiki/File:Body_male_realistic_by_Dan_Ulrich_(CC0).stl
+
+Original creators:
+Blender Studio, Dan Ulrich, Paul Kotelevets, Tonatiuh de San Julian,
+and Julien Kaspar.
+
+License:
+Creative Commons CC0 1.0 Universal Public Domain Dedication.
+https://creativecommons.org/publicdomain/zero/1.0/

@@ -180,6 +180,7 @@ export function CharacterModel({
       <group ref={bodyScale}>
         <group ref={breath}>
           <RealisticBody
+            key={profile.bodyType}
             appearance={profile.appearance}
             bodyType={profile.bodyType}
             anatomy={anatomy}

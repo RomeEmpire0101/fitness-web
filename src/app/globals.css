@@ -1018,12 +1018,69 @@ select:focus-visible,
 .lab-character {
   position: absolute;
   z-index: 2;
-  inset: 16px 2% 50px;
+  inset: 16px 2% 104px;
   cursor: grab;
 }
 
 .lab-character:active {
   cursor: grabbing;
+}
+
+.lab-input-variables {
+  position: absolute;
+  z-index: 10;
+  right: 16px;
+  bottom: 16px;
+  left: 16px;
+}
+
+.lab-input-variables h2 {
+  margin: 0 0 8px;
+  color: #6f717b;
+  font: 750 8px/1 var(--font-ui);
+  letter-spacing: 0.14em;
+  text-transform: uppercase;
+}
+
+.lab-input-variables > div {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.input-variable-pill {
+  display: inline-flex;
+  min-height: 30px;
+  align-items: center;
+  gap: 7px;
+  padding: 6px 10px;
+  border: 1px solid color-mix(in srgb, var(--pill-accent) 22%, #e1dfe7);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.82);
+  box-shadow: 0 7px 18px rgba(42, 40, 55, 0.06);
+  backdrop-filter: blur(14px);
+  -webkit-backdrop-filter: blur(14px);
+  white-space: nowrap;
+}
+
+.input-variable-pill::before {
+  width: 5px;
+  height: 5px;
+  border-radius: 50%;
+  background: var(--pill-accent);
+  content: "";
+}
+
+.input-variable-pill span {
+  color: #777983;
+  font-size: 7px;
+  font-weight: 650;
+}
+
+.input-variable-pill strong {
+  color: #2c2d34;
+  font-size: 7px;
+  font-weight: 800;
 }
 
 .lab-stage-score {
