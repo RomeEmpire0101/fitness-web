@@ -139,6 +139,12 @@ export function LabScreen({
   const [intervalLevel, setIntervalLevel] =
     useState<PredictionInterval["level"]>(80);
   const [muscleInputsOpen, setMuscleInputsOpen] = useState(true);
+  const [workspaceMode, setWorkspaceMode] = useState<"inputs" | "projection">(
+    "inputs",
+  );
+  const [resultsView, setResultsView] = useState<
+    "body" | "muscles" | "validation"
+  >("body");
 
   const confirmedInputs = useMemo(
     () => new Set(program.confirmedInputs ?? []),
@@ -169,10 +175,7 @@ export function LabScreen({
     }));
   };
 
-  const changeMeasurement = (
-    id: CharacterMeasurementId,
-    value: number,
-  ) => {
+  const changeMeasurement = (id: CharacterMeasurementId, value: number) => {
     if (!Number.isFinite(value)) return;
     onMeasurementChange(id, value);
     confirmInput(id);
@@ -235,15 +238,12 @@ export function LabScreen({
     1,
     Math.max(
       0,
-      ((profile.bodyType === "male" ? 32 : 42) -
-        result.startingBodyFatPct) /
+      ((profile.bodyType === "male" ? 32 : 42) - result.startingBodyFatPct) /
         (profile.bodyType === "male" ? 26 : 34),
     ),
   );
   const visibleSignals =
-    projectionView === "projected"
-      ? result.muscleSignals
-      : ZERO_MUSCLE_SIGNALS;
+    projectionView === "projected" ? result.muscleSignals : ZERO_MUSCLE_SIGNALS;
 
   return (
     <div className="lab-screen scientific-lab screen-enter">
@@ -273,539 +273,675 @@ export function LabScreen({
         </div>
       </header>
 
-      <section className="scientific-stage" data-testid="physique-stage">
-        <article className="scientific-stage__mesh">
-          <header>
-            <span>
-              <Activity size={13} />
-              Regional 3D projection
-            </span>
-            <small>Drag 360° · Scroll to zoom</small>
-          </header>
-          <div
-            className="projection-view-toggle scientific-view-toggle"
-            role="group"
-            aria-label="Character view"
-          >
-            <button
-              type="button"
-              className={projectionView === "starting" ? "is-active" : ""}
-              aria-pressed={projectionView === "starting"}
-              onClick={() => setProjectionView("starting")}
-            >
-              Starting body
-            </button>
-            <button
-              type="button"
-              className={projectionView === "projected" ? "is-active" : ""}
-              aria-pressed={projectionView === "projected"}
-              onClick={() => setProjectionView("projected")}
-            >
-              {result.durationWeeks}-week estimate
-            </button>
-          </div>
-          <div
-            className="scientific-character"
-            aria-label="3D character projection box"
-            data-projection-box
-          >
-            <CharacterScene
-              profile={profile}
-              growth={projectionView === "projected" ? result.growth : 0}
-              definition={
-                projectionView === "projected"
-                  ? result.definition
-                  : startingDefinition
-              }
-              stimulus={
-                projectionView === "projected" ? result.stimulus : 0
-              }
-              baselineMuscularity={result.baselineMuscularity}
-              muscleSignals={visibleSignals}
-              reducedMotion={reducedMotion}
-              interactive
-            />
-          </div>
-          <button
-            className="mesh-adjust-button"
-            type="button"
-            onClick={() => onCharacterEditorOpenChange(true)}
-          >
-            <CircleGauge size={14} />
-            Appearance controls
-          </button>
-          <div className="mesh-calibration-note">
-            <Scale size={13} />
-            <span>
-              Mesh deltas use cube-root MRI volume conversion. Baseline
-              muscularity uses FFMI plus arm and thigh measurements.
-            </span>
-          </div>
+      <nav className="workspace-mode-tabs" aria-label="Physique workspace view">
+        <button
+          type="button"
+          className={workspaceMode === "inputs" ? "is-active" : ""}
+          aria-pressed={workspaceMode === "inputs"}
+          onClick={() => setWorkspaceMode("inputs")}
+        >
+          <span>Inputs</span>
+          <small>Profile, measurements & training dose</small>
+        </button>
+        <button
+          type="button"
+          className={workspaceMode === "projection" ? "is-active" : ""}
+          aria-pressed={workspaceMode === "projection"}
+          onClick={() => setWorkspaceMode("projection")}
+        >
+          <span>Projection</span>
+          <small>3D model, intervals & validation</small>
+        </button>
+      </nav>
 
-          <CharacterEditor
-            profile={profile}
-            open={characterEditorOpen}
-            onOpenChange={onCharacterEditorOpenChange}
-            onMeasurementChange={changeMeasurement}
-            onBodyTypeChange={changeSex}
-            onAppearanceChange={onAppearanceChange}
-            onReset={onResetCharacter}
-          />
-        </article>
-
-        <aside className="projection-summary-card">
-          <div className="projection-summary-card__heading">
-            <span className="card-kicker">
-              <Sparkles size={13} />
-              Posterior centre
-            </span>
-            <strong>
-              {formatSigned(result.estimatedLeanGainKg, 2)}
-              <small> kg skeletal muscle tissue</small>
-            </strong>
-            <p>{result.status}</p>
-          </div>
-
-          <div className="interval-selector" role="group" aria-label="Prediction interval">
-            {([50, 80, 95, 99] as const).map((level) => (
-              <button
-                key={level}
-                type="button"
-                className={intervalLevel === level ? "is-active" : ""}
-                aria-pressed={intervalLevel === level}
-                onClick={() => setIntervalLevel(level)}
-              >
-                {level}%
-              </button>
-            ))}
-          </div>
-          <div className="selected-interval" data-testid="selected-interval">
-            <span>{intervalLevel}% prediction interval</span>
-            <strong>
-              {formatSigned(selectedLeanInterval.lower, 2)} to{" "}
-              {formatSigned(selectedLeanInterval.upper, 2)} kg
-            </strong>
-            <small>
-              Interval coverage target—not {intervalLevel}% point accuracy.
-            </small>
-          </div>
-
-          <div className="projection-stat-grid">
-            <span>
-              <small>Projected weight</small>
-              <b>{result.projectedWeightKg.toFixed(1)} kg</b>
-            </span>
-            <span>
-              <small>Projected body fat</small>
-              <b>{result.projectedBodyFatPct.toFixed(1)}%</b>
-            </span>
-            <span>
-              <small>Protein</small>
-              <b>{result.proteinPerKg.toFixed(2)} g/kg</b>
-            </span>
-            <span>
-              <small>Uncertainty</small>
-              <b>×{result.uncertaintyMultiplier.toFixed(2)}</b>
-            </span>
-          </div>
-
-          <div className="estimate-warning">
-            <AlertTriangle size={15} />
-            <p>
-              <strong>This is an estimate, not a diagnosis or promise.</strong>
-              Genetics and true individual response remain latent until repeated
-              standardized measurements update the model.
-            </p>
-          </div>
-        </aside>
-      </section>
-
-      <section className="input-section" aria-labelledby="required-inputs-title">
-        <header className="section-title-row">
-          <div>
-            <span className="card-kicker">Required model inputs</span>
-            <h2 id="required-inputs-title">Profile, intake and recovery</h2>
-          </div>
-          <p>
-            Defaults are population priors. Touch each field to confirm your
-            value and narrow uncertainty.
-          </p>
-        </header>
-
-        <div className="required-input-layout">
-          <article className="input-panel">
-            <h3>Demographics & plan</h3>
-            <div className="sex-control">
+      {workspaceMode === "projection" ? (
+        <section className="scientific-stage" data-testid="physique-stage">
+          <article className="scientific-stage__mesh">
+            <header>
               <span>
-                Sex
-                <RequiredMark confirmed={confirmedInputs.has("sex")} />
+                <Activity size={13} />
+                Regional 3D projection
               </span>
-              <div role="group" aria-label="Sex">
-                {(["male", "female"] as const).map((bodyType) => (
-                  <button
-                    key={bodyType}
-                    type="button"
-                    className={profile.bodyType === bodyType ? "is-active" : ""}
-                    aria-pressed={profile.bodyType === bodyType}
-                    onClick={() => changeSex(bodyType)}
-                  >
-                    {bodyType === "male" ? "Male" : "Female"}
-                  </button>
-                ))}
-              </div>
+              <small>Drag 360° · Scroll to zoom</small>
+            </header>
+            <div
+              className="projection-view-toggle scientific-view-toggle"
+              role="group"
+              aria-label="Character view"
+            >
+              <button
+                type="button"
+                className={projectionView === "starting" ? "is-active" : ""}
+                aria-pressed={projectionView === "starting"}
+                onClick={() => setProjectionView("starting")}
+              >
+                Starting body
+              </button>
+              <button
+                type="button"
+                className={projectionView === "projected" ? "is-active" : ""}
+                aria-pressed={projectionView === "projected"}
+                onClick={() => setProjectionView("projected")}
+              >
+                {result.durationWeeks}-week estimate
+              </button>
             </div>
-            <div className="compact-input-grid">
-              {GLOBAL_METRICS.map((id) => {
-                const definition = METRICS.find((candidate) => candidate.id === id)!;
-                return (
-                  <label key={id} className="scientific-number-input">
-                    <span>
-                      {definition.label}
-                      <RequiredMark confirmed={confirmedInputs.has(id)} />
-                    </span>
-                    <div>
-                      <input
-                        type="number"
-                        min={definition.min}
-                        max={definition.max}
-                        step={definition.step}
-                        value={program.values[id]}
-                        onChange={(event) =>
-                          changeMetric(id, Number(event.target.value))
-                        }
-                        aria-label={definition.label}
-                      />
-                      <small>{definition.shortUnit}</small>
-                    </div>
-                  </label>
-                );
-              })}
+            <div
+              className="scientific-character"
+              aria-label="3D character projection box"
+              data-projection-box
+            >
+              <CharacterScene
+                profile={profile}
+                growth={projectionView === "projected" ? result.growth : 0}
+                definition={
+                  projectionView === "projected"
+                    ? result.definition
+                    : startingDefinition
+                }
+                stimulus={projectionView === "projected" ? result.stimulus : 0}
+                baselineMuscularity={result.baselineMuscularity}
+                muscleSignals={visibleSignals}
+                reducedMotion={reducedMotion}
+                interactive
+              />
             </div>
-          </article>
+            <button
+              className="mesh-adjust-button"
+              type="button"
+              onClick={() => onCharacterEditorOpenChange(true)}
+            >
+              <CircleGauge size={14} />
+              Appearance controls
+            </button>
+            <div className="mesh-calibration-note">
+              <Scale size={13} />
+              <span>
+                Mesh deltas use cube-root MRI volume conversion. Baseline
+                muscularity uses FFMI plus arm and thigh measurements.
+              </span>
+            </div>
 
-          <article className="input-panel">
-            <h3>Body measurements</h3>
-            <div className="compact-input-grid">
-              {BODY_MEASUREMENTS.map((measurement) => (
-                <label
-                  key={measurement.id}
-                  className="scientific-number-input"
-                >
-                  <span>
-                    {measurement.label}
-                    <RequiredMark
-                      confirmed={confirmedInputs.has(measurement.id)}
-                    />
-                  </span>
-                  <div>
-                    <input
-                      type="number"
-                      step={measurement.step}
-                      value={profile.measurements[measurement.id]}
-                      onChange={(event) =>
-                        changeMeasurement(
-                          measurement.id,
-                          Number(event.target.value),
-                        )
-                      }
-                      aria-label={measurement.label}
-                    />
-                    <small>{measurement.unit}</small>
-                  </div>
-                </label>
-              ))}
-              <label className="scientific-number-input scientific-select-input">
-                <span>
-                  Body-fat method
-                  <RequiredMark
-                    confirmed={confirmedInputs.has("bodyFatMethod")}
-                  />
-                </span>
-                <select
-                  value={program.bodyFatMethod}
-                  onChange={changeBodyFatMethod}
-                  aria-label="Body-fat method"
-                >
-                  {BODY_FAT_METHODS.map((method) => (
-                    <option key={method.id} value={method.id}>
-                      {method.label} (±{method.typicalErrorPct}% typical)
-                    </option>
-                  ))}
-                </select>
-              </label>
-            </div>
-          </article>
-        </div>
-      </section>
-
-      <section className="input-section muscle-dose-section">
-        <header className="section-title-row">
-          <div>
-            <span className="card-kicker">Per-muscle exposure</span>
-            <h2>Exercises and weekly dose</h2>
-          </div>
-          <button
-            type="button"
-            className="section-collapse-button"
-            aria-expanded={muscleInputsOpen}
-            onClick={() => setMuscleInputsOpen((open) => !open)}
-          >
-            {confirmedMuscles.size}/{MUSCLE_GROUPS.length} confirmed
-            <ChevronDown
-              size={14}
-              className={muscleInputsOpen ? "is-open" : ""}
+            <CharacterEditor
+              profile={profile}
+              open={characterEditorOpen}
+              onOpenChange={onCharacterEditorOpenChange}
+              onMeasurementChange={changeMeasurement}
+              onBodyTypeChange={changeSex}
+              onAppearanceChange={onAppearanceChange}
+              onReset={onResetCharacter}
             />
-          </button>
-        </header>
+          </article>
 
-        {muscleInputsOpen ? (
-          <div className="muscle-dose-table" role="table" aria-label="Per-muscle training inputs">
-            <div className="muscle-dose-row muscle-dose-row--head" role="row">
-              <span>Muscle / exercise</span>
-              <span>Direct sets</span>
-              <span>Indirect sets</span>
-              <span>Reps</span>
-              <span>RIR</span>
-              <span>Frequency</span>
-              <span>Status</span>
+          <aside className="projection-summary-card">
+            <div className="projection-summary-card__heading">
+              <span className="card-kicker">
+                <Sparkles size={13} />
+                Posterior centre
+              </span>
+              <strong>
+                {formatSigned(result.estimatedLeanGainKg, 2)}
+                <small> kg skeletal muscle tissue</small>
+              </strong>
+              <p>{result.status}</p>
             </div>
-            {MUSCLE_GROUPS.map((muscle) => {
-              const setting = program.muscles[muscle.id];
-              return (
-                <div
-                  key={muscle.id}
-                  className={`muscle-dose-row ${
-                    confirmedMuscles.has(muscle.id) ? "is-confirmed" : ""
-                  }`}
-                  role="row"
+
+            <div
+              className="interval-selector"
+              role="group"
+              aria-label="Prediction interval"
+            >
+              {([50, 80, 95, 99] as const).map((level) => (
+                <button
+                  key={level}
+                  type="button"
+                  className={intervalLevel === level ? "is-active" : ""}
+                  aria-pressed={intervalLevel === level}
+                  onClick={() => setIntervalLevel(level)}
                 >
-                  <label className="muscle-exercise-input">
-                    <span>
-                      <i style={{ background: muscle.color }} />
-                      {muscle.label}
-                      <RequiredMark
-                        confirmed={confirmedMuscles.has(muscle.id)}
-                      />
-                    </span>
-                    <input
-                      type="text"
-                      value={setting.exercise}
-                      onChange={(event) =>
-                        changeMuscle(muscle.id, "exercise", event.target.value)
-                      }
-                      aria-label={`${muscle.label} exercise`}
-                    />
-                  </label>
-                  {MUSCLE_NUMBER_FIELDS.map((field) => (
-                    <label key={field}>
-                      <span className="mobile-field-label">
-                        {field === "sets"
-                          ? "Direct sets"
-                          : field === "indirectSets"
-                            ? "Indirect sets"
-                            : field === "frequency"
-                              ? "Frequency"
-                              : field.toUpperCase()}
+                  {level}%
+                </button>
+              ))}
+            </div>
+            <div className="selected-interval" data-testid="selected-interval">
+              <span>{intervalLevel}% prediction interval</span>
+              <strong>
+                {formatSigned(selectedLeanInterval.lower, 2)} to{" "}
+                {formatSigned(selectedLeanInterval.upper, 2)} kg
+              </strong>
+              <small>
+                Interval coverage target—not {intervalLevel}% point accuracy.
+              </small>
+            </div>
+
+            <div className="projection-stat-grid">
+              <span>
+                <small>Projected weight</small>
+                <b>{result.projectedWeightKg.toFixed(1)} kg</b>
+              </span>
+              <span>
+                <small>Projected body fat</small>
+                <b>{result.projectedBodyFatPct.toFixed(1)}%</b>
+              </span>
+              <span>
+                <small>Protein</small>
+                <b>{result.proteinPerKg.toFixed(2)} g/kg</b>
+              </span>
+              <span>
+                <small>Uncertainty</small>
+                <b>×{result.uncertaintyMultiplier.toFixed(2)}</b>
+              </span>
+            </div>
+
+            <div className="estimate-warning">
+              <AlertTriangle size={15} />
+              <p>
+                <strong>
+                  This is an estimate, not a diagnosis or promise.
+                </strong>
+                Genetics and true individual response remain latent until
+                repeated standardized measurements update the model.
+              </p>
+            </div>
+          </aside>
+        </section>
+      ) : null}
+
+      {workspaceMode === "inputs" ? (
+        <>
+          <section
+            className="input-section"
+            aria-labelledby="required-inputs-title"
+          >
+            <header className="section-title-row">
+              <div>
+                <span className="card-kicker">Required model inputs</span>
+                <h2 id="required-inputs-title">Profile, intake and recovery</h2>
+              </div>
+              <p>
+                Defaults are population priors. Touch each field to confirm your
+                value and narrow uncertainty.
+              </p>
+            </header>
+
+            <div className="required-input-layout">
+              <article className="input-panel">
+                <h3>Demographics & plan</h3>
+                <div className="sex-control">
+                  <span>
+                    Sex
+                    <RequiredMark confirmed={confirmedInputs.has("sex")} />
+                  </span>
+                  <div role="group" aria-label="Sex">
+                    {(["male", "female"] as const).map((bodyType) => (
+                      <button
+                        key={bodyType}
+                        type="button"
+                        className={
+                          profile.bodyType === bodyType ? "is-active" : ""
+                        }
+                        aria-pressed={profile.bodyType === bodyType}
+                        onClick={() => changeSex(bodyType)}
+                      >
+                        {bodyType === "male" ? "Male" : "Female"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+                <div className="compact-input-grid">
+                  {GLOBAL_METRICS.map((id) => {
+                    const definition = METRICS.find(
+                      (candidate) => candidate.id === id,
+                    )!;
+                    return (
+                      <label key={id} className="scientific-number-input">
+                        <span>
+                          {definition.label}
+                          <RequiredMark confirmed={confirmedInputs.has(id)} />
+                        </span>
+                        <div>
+                          <input
+                            type="number"
+                            min={definition.min}
+                            max={definition.max}
+                            step={definition.step}
+                            value={program.values[id]}
+                            onChange={(event) =>
+                              changeMetric(id, Number(event.target.value))
+                            }
+                            aria-label={definition.label}
+                          />
+                          <small>{definition.shortUnit}</small>
+                        </div>
+                      </label>
+                    );
+                  })}
+                </div>
+              </article>
+
+              <article className="input-panel">
+                <h3>Body measurements</h3>
+                <div className="compact-input-grid">
+                  {BODY_MEASUREMENTS.map((measurement) => (
+                    <label
+                      key={measurement.id}
+                      className="scientific-number-input"
+                    >
+                      <span>
+                        {measurement.label}
+                        <RequiredMark
+                          confirmed={confirmedInputs.has(measurement.id)}
+                        />
                       </span>
-                      <input
-                        type="number"
-                        min={field === "rir" || field.includes("Sets") || field === "sets" ? 0 : 1}
-                        max={
-                          field === "rir"
-                            ? 8
-                            : field === "frequency"
-                              ? 7
-                              : field === "reps"
-                                ? 50
-                                : 40
-                        }
-                        step={1}
-                        value={setting[field]}
-                        onChange={(event) =>
-                          changeMuscle(
-                            muscle.id,
-                            field,
-                            Math.max(0, Number(event.target.value)),
-                          )
-                        }
-                        aria-label={`${muscle.label} ${field}`}
-                      />
+                      <div>
+                        <input
+                          type="number"
+                          step={measurement.step}
+                          value={profile.measurements[measurement.id]}
+                          onChange={(event) =>
+                            changeMeasurement(
+                              measurement.id,
+                              Number(event.target.value),
+                            )
+                          }
+                          aria-label={measurement.label}
+                        />
+                        <small>{measurement.unit}</small>
+                      </div>
                     </label>
                   ))}
-                  <button
-                    type="button"
-                    className="confirm-muscle-row"
-                    disabled={confirmedMuscles.has(muscle.id)}
-                    onClick={() => confirmMuscle(muscle.id)}
-                    aria-label={`Confirm ${muscle.label} inputs`}
-                  >
-                    {confirmedMuscles.has(muscle.id) ? "Confirmed" : "Confirm row"}
-                  </button>
+                  <label className="scientific-number-input scientific-select-input">
+                    <span>
+                      Body-fat method
+                      <RequiredMark
+                        confirmed={confirmedInputs.has("bodyFatMethod")}
+                      />
+                    </span>
+                    <select
+                      value={program.bodyFatMethod}
+                      onChange={changeBodyFatMethod}
+                      aria-label="Body-fat method"
+                    >
+                      {BODY_FAT_METHODS.map((method) => (
+                        <option key={method.id} value={method.id}>
+                          {method.label} (±{method.typicalErrorPct}% typical)
+                        </option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              );
-            })}
-          </div>
-        ) : null}
-        <p className="dose-method-note">
-          Direct sets receive full dose. Indirect sets use a conservative,
-          uncertainty-bearing 0.4 effective-set prior; frequency distributes
-          volume but is not awarded an independent hypertrophy bonus.
-        </p>
-      </section>
+              </article>
+            </div>
+          </section>
 
-      <section className="results-section" aria-labelledby="projection-results-title">
-        <header className="section-title-row">
-          <div>
-            <span className="card-kicker">Posterior decomposition</span>
-            <h2 id="projection-results-title">What the scale change contains</h2>
-          </div>
-          <p>Fat, muscle tissue, glycogen and water are not conflated.</p>
-        </header>
-        <div className="component-grid">
-          {result.components.map((component) => (
-            <article key={component.id} className={`component-card component-card--${component.id}`}>
-              <span>
-                {component.id === "water" || component.id === "glycogen" ? (
-                  <Droplets size={15} />
-                ) : (
-                  <BarChart3 size={15} />
-                )}
-                {component.label}
-              </span>
-              <strong>{formatSigned(component.changeKg, 2)} kg</strong>
-              <small>
-                {component.startingKg.toFixed(1)} →{" "}
-                {component.projectedKg.toFixed(1)} kg · uncertainty ±
-                {component.uncertaintyKg.toFixed(1)}
-              </small>
-            </article>
-          ))}
-        </div>
-      </section>
-
-      <section className="results-section">
-        <header className="section-title-row">
-          <div>
-            <span className="card-kicker">Regional posterior</span>
-            <h2>Per-muscle hypertrophy</h2>
-          </div>
-          <p>{intervalLevel}% intervals include responder and measurement variability.</p>
-        </header>
-        <div className="muscle-result-table">
-          <div className="muscle-result-row muscle-result-row--head">
-            <span>Muscle</span>
-            <span>Effective sets</span>
-            <span>Mean estimate</span>
-            <span>{intervalLevel}% interval</span>
-            <span>Mesh radius</span>
-          </div>
-          {MUSCLE_GROUPS.map((muscle) => {
-            const projection = result.muscleProjections[muscle.id];
-            const interval = getInterval(projection.intervals, intervalLevel);
-            return (
-              <div key={muscle.id} className="muscle-result-row">
-                <span>
-                  <i style={{ background: muscle.color }} />
-                  <b>{muscle.label}</b>
-                  <small>{projection.evidenceGrade} evidence</small>
-                </span>
-                <span>{projection.effectiveSets.toFixed(1)}</span>
-                <span>{formatSigned(projection.meanPercent, 1)}%</span>
-                <span>
-                  {formatSigned(interval.lower, 1)} to{" "}
-                  {formatSigned(interval.upper, 1)}%
-                </span>
-                <span>{formatSigned(projection.radialMeshChange * 100, 2)}%</span>
+          <section className="input-section muscle-dose-section">
+            <header className="section-title-row">
+              <div>
+                <span className="card-kicker">Per-muscle exposure</span>
+                <h2>Exercises and weekly dose</h2>
               </div>
-            );
-          })}
-        </div>
-      </section>
-
-      <section className="validation-section" data-testid="model-validation">
-        <article className="validation-card">
-          <header>
-            <span className="card-kicker">
-              <BarChart3 size={13} />
-              Held-out validation
-            </span>
-            <h2>Study-level performance on unseen cohorts</h2>
-            <p>{result.validation.scope}</p>
-          </header>
-          <div className="validation-metric-grid">
-            <span>
-              <small>MAE</small>
-              <b>{result.validation.maePercentPoints.toFixed(2)} pp</b>
-              <em>regional hypertrophy</em>
-            </span>
-            <span>
-              <small>Mean bias</small>
-              <b>{formatSigned(result.validation.meanBiasPercentPoints, 2)} pp</b>
-              <em>predicted − observed</em>
-            </span>
-            <span>
-              <small>Calibration error</small>
-              <b>{result.validation.calibrationErrorPercentPoints.toFixed(1)} pp</b>
-              <em>mean coverage gap</em>
-            </span>
-            <span>
-              <small>Holdout sample</small>
-              <b>{result.validation.holdoutCohorts} cohorts</b>
-              <em>{result.validation.participants} participant-records</em>
-            </span>
-          </div>
-          <div className="coverage-grid">
-            {result.validation.coverage.map((coverage) => (
-              <span key={coverage.level}>
-                <small>{coverage.level}% target</small>
-                <b>{coverage.observed.toFixed(1)}% observed</b>
-                <i>
-                  <span
-                    style={{ width: `${Math.min(100, coverage.observed)}%` }}
-                  />
-                </i>
-              </span>
-            ))}
-          </div>
-          <div className="validation-honesty">
-            <AlertTriangle size={15} />
-            <p>
-              A cohort-level MAE cannot be translated into personal point
-              accuracy. The 99% output is deliberately an interval, never a
-              claim that one number is 99% correct.
-            </p>
-          </div>
-        </article>
-
-        <article className="evidence-card">
-          <header>
-            <span className="card-kicker">
-              <BookOpen size={13} />
-              Evidence map
-            </span>
-            <h2>Longitudinal anchors</h2>
-            <p>
-              Primary studies are separated by the role they play in the
-              estimator.
-            </p>
-          </header>
-          <div>
-            {MODEL_SOURCES.map((source) => (
-              <a
-                key={source.id}
-                href={source.url}
-                target="_blank"
-                rel="noreferrer"
+              <button
+                type="button"
+                className="section-collapse-button"
+                aria-expanded={muscleInputsOpen}
+                onClick={() => setMuscleInputsOpen((open) => !open)}
               >
-                <span>{source.label}</span>
-                <small>{source.role}</small>
-              </a>
-            ))}
-          </div>
-        </article>
-      </section>
+                {confirmedMuscles.size}/{MUSCLE_GROUPS.length} confirmed
+                <ChevronDown
+                  size={14}
+                  className={muscleInputsOpen ? "is-open" : ""}
+                />
+              </button>
+            </header>
 
-      {result.missingInputs.length > 0 ? (
+            {muscleInputsOpen ? (
+              <div
+                className="muscle-dose-table"
+                role="table"
+                aria-label="Per-muscle training inputs"
+              >
+                <div
+                  className="muscle-dose-row muscle-dose-row--head"
+                  role="row"
+                >
+                  <span>Muscle / exercise</span>
+                  <span>Direct sets</span>
+                  <span>Indirect sets</span>
+                  <span>Reps</span>
+                  <span>RIR</span>
+                  <span>Frequency</span>
+                  <span>Status</span>
+                </div>
+                {MUSCLE_GROUPS.map((muscle) => {
+                  const setting = program.muscles[muscle.id];
+                  return (
+                    <div
+                      key={muscle.id}
+                      className={`muscle-dose-row ${
+                        confirmedMuscles.has(muscle.id) ? "is-confirmed" : ""
+                      }`}
+                      role="row"
+                    >
+                      <label className="muscle-exercise-input">
+                        <span>
+                          <i style={{ background: muscle.color }} />
+                          {muscle.label}
+                          <RequiredMark
+                            confirmed={confirmedMuscles.has(muscle.id)}
+                          />
+                        </span>
+                        <input
+                          type="text"
+                          value={setting.exercise}
+                          onChange={(event) =>
+                            changeMuscle(
+                              muscle.id,
+                              "exercise",
+                              event.target.value,
+                            )
+                          }
+                          aria-label={`${muscle.label} exercise`}
+                        />
+                      </label>
+                      {MUSCLE_NUMBER_FIELDS.map((field) => (
+                        <label key={field}>
+                          <span className="mobile-field-label">
+                            {field === "sets"
+                              ? "Direct sets"
+                              : field === "indirectSets"
+                                ? "Indirect sets"
+                                : field === "frequency"
+                                  ? "Frequency"
+                                  : field.toUpperCase()}
+                          </span>
+                          <input
+                            type="number"
+                            min={
+                              field === "rir" ||
+                              field.includes("Sets") ||
+                              field === "sets"
+                                ? 0
+                                : 1
+                            }
+                            max={
+                              field === "rir"
+                                ? 8
+                                : field === "frequency"
+                                  ? 7
+                                  : field === "reps"
+                                    ? 50
+                                    : 40
+                            }
+                            step={1}
+                            value={setting[field]}
+                            onChange={(event) =>
+                              changeMuscle(
+                                muscle.id,
+                                field,
+                                Math.max(0, Number(event.target.value)),
+                              )
+                            }
+                            aria-label={`${muscle.label} ${field}`}
+                          />
+                        </label>
+                      ))}
+                      <button
+                        type="button"
+                        className="confirm-muscle-row"
+                        disabled={confirmedMuscles.has(muscle.id)}
+                        onClick={() => confirmMuscle(muscle.id)}
+                        aria-label={`Confirm ${muscle.label} inputs`}
+                      >
+                        {confirmedMuscles.has(muscle.id)
+                          ? "Confirmed"
+                          : "Confirm row"}
+                      </button>
+                    </div>
+                  );
+                })}
+              </div>
+            ) : null}
+            <p className="dose-method-note">
+              Direct sets receive full dose. Indirect sets use a conservative,
+              uncertainty-bearing 0.4 effective-set prior; frequency distributes
+              volume but is not awarded an independent hypertrophy bonus.
+            </p>
+          </section>
+        </>
+      ) : null}
+
+      {workspaceMode === "projection" ? (
+        <section className="results-workspace" aria-label="Projection results">
+          <header className="results-workspace__header">
+            <div>
+              <span className="card-kicker">Model output</span>
+              <h2>Explore the estimate</h2>
+            </div>
+            <div
+              className="results-view-tabs"
+              role="group"
+              aria-label="Projection result view"
+            >
+              <button
+                type="button"
+                className={resultsView === "body" ? "is-active" : ""}
+                aria-pressed={resultsView === "body"}
+                onClick={() => setResultsView("body")}
+              >
+                Body composition
+              </button>
+              <button
+                type="button"
+                className={resultsView === "muscles" ? "is-active" : ""}
+                aria-pressed={resultsView === "muscles"}
+                onClick={() => setResultsView("muscles")}
+              >
+                Regional muscles
+              </button>
+              <button
+                type="button"
+                className={resultsView === "validation" ? "is-active" : ""}
+                aria-pressed={resultsView === "validation"}
+                onClick={() => setResultsView("validation")}
+              >
+                Validation &amp; evidence
+              </button>
+            </div>
+          </header>
+
+          {resultsView === "body" ? (
+            <section
+              className="results-section"
+              aria-labelledby="projection-results-title"
+            >
+              <header className="section-title-row">
+                <div>
+                  <span className="card-kicker">Posterior decomposition</span>
+                  <h2 id="projection-results-title">
+                    What the scale change contains
+                  </h2>
+                </div>
+                <p>Fat, muscle tissue, glycogen and water are not conflated.</p>
+              </header>
+              <div className="component-grid">
+                {result.components.map((component) => (
+                  <article
+                    key={component.id}
+                    className={`component-card component-card--${component.id}`}
+                  >
+                    <span>
+                      {component.id === "water" ||
+                      component.id === "glycogen" ? (
+                        <Droplets size={15} />
+                      ) : (
+                        <BarChart3 size={15} />
+                      )}
+                      {component.label}
+                    </span>
+                    <strong>{formatSigned(component.changeKg, 2)} kg</strong>
+                    <small>
+                      {component.startingKg.toFixed(1)} →{" "}
+                      {component.projectedKg.toFixed(1)} kg · uncertainty ±
+                      {component.uncertaintyKg.toFixed(1)}
+                    </small>
+                  </article>
+                ))}
+              </div>
+            </section>
+          ) : null}
+
+          {resultsView === "muscles" ? (
+            <section className="results-section">
+              <header className="section-title-row">
+                <div>
+                  <span className="card-kicker">Regional posterior</span>
+                  <h2>Per-muscle hypertrophy</h2>
+                </div>
+                <p>
+                  {intervalLevel}% intervals include responder and measurement
+                  variability.
+                </p>
+              </header>
+              <div className="muscle-result-table">
+                <div className="muscle-result-row muscle-result-row--head">
+                  <span>Muscle</span>
+                  <span>Effective sets</span>
+                  <span>Mean estimate</span>
+                  <span>{intervalLevel}% interval</span>
+                  <span>Mesh radius</span>
+                </div>
+                {MUSCLE_GROUPS.map((muscle) => {
+                  const projection = result.muscleProjections[muscle.id];
+                  const interval = getInterval(
+                    projection.intervals,
+                    intervalLevel,
+                  );
+                  return (
+                    <div key={muscle.id} className="muscle-result-row">
+                      <span>
+                        <i style={{ background: muscle.color }} />
+                        <b>{muscle.label}</b>
+                        <small>{projection.evidenceGrade} evidence</small>
+                      </span>
+                      <span>{projection.effectiveSets.toFixed(1)}</span>
+                      <span>{formatSigned(projection.meanPercent, 1)}%</span>
+                      <span>
+                        {formatSigned(interval.lower, 1)} to{" "}
+                        {formatSigned(interval.upper, 1)}%
+                      </span>
+                      <span>
+                        {formatSigned(projection.radialMeshChange * 100, 2)}%
+                      </span>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
+          {resultsView === "validation" ? (
+            <section
+              className="validation-section"
+              data-testid="model-validation"
+            >
+              <article className="validation-card">
+                <header>
+                  <span className="card-kicker">
+                    <BarChart3 size={13} />
+                    Held-out validation
+                  </span>
+                  <h2>Study-level performance on unseen cohorts</h2>
+                  <p>{result.validation.scope}</p>
+                </header>
+                <div className="validation-metric-grid">
+                  <span>
+                    <small>MAE</small>
+                    <b>{result.validation.maePercentPoints.toFixed(2)} pp</b>
+                    <em>regional hypertrophy</em>
+                  </span>
+                  <span>
+                    <small>Mean bias</small>
+                    <b>
+                      {formatSigned(result.validation.meanBiasPercentPoints, 2)}{" "}
+                      pp
+                    </b>
+                    <em>predicted − observed</em>
+                  </span>
+                  <span>
+                    <small>Calibration error</small>
+                    <b>
+                      {result.validation.calibrationErrorPercentPoints.toFixed(
+                        1,
+                      )}{" "}
+                      pp
+                    </b>
+                    <em>mean coverage gap</em>
+                  </span>
+                  <span>
+                    <small>Holdout sample</small>
+                    <b>{result.validation.holdoutCohorts} cohorts</b>
+                    <em>
+                      {result.validation.participants} participant-records
+                    </em>
+                  </span>
+                </div>
+                <div className="coverage-grid">
+                  {result.validation.coverage.map((coverage) => (
+                    <span key={coverage.level}>
+                      <small>{coverage.level}% target</small>
+                      <b>{coverage.observed.toFixed(1)}% observed</b>
+                      <i>
+                        <span
+                          style={{
+                            width: `${Math.min(100, coverage.observed)}%`,
+                          }}
+                        />
+                      </i>
+                    </span>
+                  ))}
+                </div>
+                <div className="validation-honesty">
+                  <AlertTriangle size={15} />
+                  <p>
+                    A cohort-level MAE cannot be translated into personal point
+                    accuracy. The 99% output is deliberately an interval, never
+                    a claim that one number is 99% correct.
+                  </p>
+                </div>
+              </article>
+
+              <article className="evidence-card">
+                <header>
+                  <span className="card-kicker">
+                    <BookOpen size={13} />
+                    Evidence map
+                  </span>
+                  <h2>Longitudinal anchors</h2>
+                  <p>
+                    Primary studies are separated by the role they play in the
+                    estimator.
+                  </p>
+                </header>
+                <div>
+                  {MODEL_SOURCES.map((source) => (
+                    <a
+                      key={source.id}
+                      href={source.url}
+                      target="_blank"
+                      rel="noreferrer"
+                    >
+                      <span>{source.label}</span>
+                      <small>{source.role}</small>
+                    </a>
+                  ))}
+                </div>
+              </article>
+            </section>
+          ) : null}
+        </section>
+      ) : null}
+
+      {workspaceMode === "inputs" && result.missingInputs.length > 0 ? (
         <section className="missing-input-banner">
           <AlertTriangle size={16} />
           <div>
@@ -821,7 +957,7 @@ export function LabScreen({
             </div>
           </div>
         </section>
-      ) : (
+      ) : workspaceMode === "inputs" ? (
         <section className="missing-input-banner is-complete">
           <BadgeCheck size={17} />
           <div>
@@ -829,7 +965,7 @@ export function LabScreen({
             <p>{result.guidance}</p>
           </div>
         </section>
-      )}
+      ) : null}
     </div>
   );
 }
