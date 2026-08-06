@@ -136,6 +136,17 @@ assert(
   "Muscle-dose rows must require explicit confirmation and invalidate it after edits.",
 );
 
+const fitnessDataSource = await import("node:fs/promises").then(({ readFile }) =>
+  readFile(new URL("../src/lib/fitnessData.ts", import.meta.url), "utf8"),
+);
+assert(
+  fitnessDataSource.includes(
+    "const hasScientificMuscleSchema = Array.isArray(partial.confirmedMuscles)",
+  ) &&
+    fitnessDataSource.includes("hasScientificMuscleSchema &&"),
+  "Unconfirmed scientific muscle-dose drafts must survive normalization.",
+);
+
 console.log(
   `Scientific model checks passed: holdout MAE ${MODEL_VALIDATION.maePercentPoints} pp across ${MODEL_VALIDATION.holdoutCohorts} cohorts.`,
 );

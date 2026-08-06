@@ -149,13 +149,19 @@ function normalizeTrainingProgram(
     partial.muscles && typeof partial.muscles === "object"
       ? partial.muscles
       : fallback.muscles;
+  // The confirmation array was introduced with the scientific muscle schema.
+  // Once it exists, keep row edits even while a row is unconfirmed; confirmation
+  // controls uncertainty and must not decide whether the draft values survive.
+  const hasScientificMuscleSchema = Array.isArray(partial.confirmedMuscles);
   const muscles = MUSCLE_GROUPS.reduce((normalized, muscle) => {
-    const rowHasScientificProvenance =
-      Array.isArray(partial.confirmedMuscles) &&
-      partial.confirmedMuscles.includes(muscle.id);
+    const sourceRow = sourceMuscles[muscle.id];
     normalized[muscle.id] = {
       ...fallback.muscles[muscle.id],
-      ...(rowHasScientificProvenance ? sourceMuscles[muscle.id] : {}),
+      ...(hasScientificMuscleSchema &&
+      sourceRow &&
+      typeof sourceRow === "object"
+        ? sourceRow
+        : {}),
     };
     return normalized;
   }, { ...fallback.muscles });

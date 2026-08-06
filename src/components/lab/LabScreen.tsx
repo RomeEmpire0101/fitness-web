@@ -2,18 +2,17 @@
 
 import {
   Activity,
-  AlertTriangle,
   BadgeCheck,
-  BarChart3,
-  BookOpen,
-  BrainCircuit,
-  ChevronDown,
   CircleGauge,
-  Droplets,
-  Scale,
-  Sparkles,
+  SlidersHorizontal,
 } from "lucide-react";
-import { ChangeEvent, useMemo, useState } from "react";
+import {
+  ChangeEvent,
+  CSSProperties,
+  KeyboardEvent,
+  useMemo,
+  useState,
+} from "react";
 import {
   CharacterAppearance,
   CharacterBodyType,
@@ -21,17 +20,18 @@ import {
   CharacterMeasurementId,
   CharacterProfile,
 } from "@/features/characters";
+import { CHARACTER_MEASUREMENTS } from "@/features/characters/config";
 import CharacterScene from "@/features/characters/scene/CharacterScene";
 import {
   BODY_FAT_METHODS,
   METRICS,
-  MODEL_SOURCES,
+  MODEL_VERSION,
   MUSCLE_GROUPS,
   MetricId,
   MuscleGroupId,
+  MusclePriority,
   MuscleSetting,
   PhysiqueResult,
-  PredictionInterval,
   RequiredInputKey,
   TrainingProgram,
 } from "@/lib/simulation";
@@ -55,68 +55,202 @@ type LabScreenProps = {
   onResetCharacter: () => void;
 };
 
-const GLOBAL_METRICS = [
+type InputMode = "training" | "body" | "muscle";
+
+const TRAINING_INPUT_IDS = [
   "age",
   "trainingYears",
   "weeks",
+  "adherence",
+] as const satisfies readonly MetricId[];
+
+const RECOVERY_INPUT_IDS = [
+  "dailyCalories",
+  "proteinGrams",
+  "sleepHours",
+] as const satisfies readonly MetricId[];
+
+const REQUIRED_GLOBAL_INPUTS = [
+  "age",
+  "sex",
+  "trainingYears",
   "dailyCalories",
   "proteinGrams",
   "sleepHours",
   "adherence",
-] as const satisfies readonly MetricId[];
+  "weeks",
+  "heightCm",
+  "weightKg",
+  "bodyFatPct",
+  "bodyFatMethod",
+  "waistCm",
+  "neckCm",
+  "chestCm",
+  "upperArmCm",
+  "thighCm",
+  "hipCm",
+] as const satisfies readonly RequiredInputKey[];
 
-const BODY_MEASUREMENTS: Array<{
-  id: CharacterMeasurementId;
-  label: string;
-  unit: string;
-  step: number;
-}> = [
-  { id: "heightCm", label: "Height", unit: "cm", step: 1 },
-  { id: "weightKg", label: "Weight", unit: "kg", step: 0.5 },
-  { id: "bodyFatPct", label: "Body fat", unit: "%", step: 0.5 },
-  { id: "waistCm", label: "Waist", unit: "cm", step: 0.5 },
-  { id: "neckCm", label: "Neck", unit: "cm", step: 0.5 },
-  { id: "chestCm", label: "Chest", unit: "cm", step: 0.5 },
-  { id: "upperArmCm", label: "Upper arm", unit: "cm", step: 0.5 },
-  { id: "thighCm", label: "Thigh", unit: "cm", step: 0.5 },
-  { id: "hipCm", label: "Hip", unit: "cm", step: 0.5 },
-];
-
-const MUSCLE_NUMBER_FIELDS = [
-  "sets",
-  "indirectSets",
-  "reps",
-  "rir",
-  "frequency",
-] as const satisfies ReadonlyArray<
-  Exclude<keyof MuscleSetting, "exercise" | "priority">
->;
-
-const ZERO_MUSCLE_SIGNALS = MUSCLE_GROUPS.reduce(
-  (signals, muscle) => {
-    signals[muscle.id] = 0;
-    return signals;
+const MUSCLE_LIMITS: Record<
+  Exclude<keyof MuscleSetting, "exercise" | "priority">,
+  { label: string; unit: string; min: number; max: number; step: number }
+> = {
+  sets: { label: "Direct sets", unit: "sets", min: 0, max: 40, step: 1 },
+  indirectSets: {
+    label: "Indirect sets",
+    unit: "sets",
+    min: 0,
+    max: 40,
+    step: 1,
   },
-  {} as Record<MuscleGroupId, number>,
-);
+  reps: { label: "Average reps", unit: "reps", min: 1, max: 40, step: 1 },
+  rir: { label: "Reps in reserve", unit: "RIR", min: 0, max: 6, step: 1 },
+  frequency: {
+    label: "Weekly frequency",
+    unit: "days",
+    min: 1,
+    max: 7,
+    step: 1,
+  },
+};
 
-const getInterval = (
-  intervals: PredictionInterval[],
-  level: PredictionInterval["level"],
-) => intervals.find((interval) => interval.level === level) ?? intervals[0];
+const getMetric = (id: MetricId) =>
+  METRICS.find((metric) => metric.id === id)!;
 
-const formatSigned = (value: number, digits = 1) =>
-  `${value > 0 ? "+" : ""}${value.toFixed(digits)}`;
+const precisionFor = (step: number) => {
+  const decimals = String(step).split(".")[1]?.length ?? 0;
+  return Math.min(decimals, 2);
+};
 
-function RequiredMark({ confirmed }: { confirmed: boolean }) {
+type NumberVariableProps = {
+  label: string;
+  value: number;
+  unit: string;
+  min: number;
+  max: number;
+  step: number;
+  confirmed?: boolean;
+  onChange: (value: number) => void;
+};
+
+function NumberVariable({
+  label,
+  value,
+  unit,
+  min,
+  max,
+  step,
+  confirmed = false,
+  onChange,
+}: NumberVariableProps) {
+  const precision = precisionFor(step);
+  const formatValue = (next: number) => next.toFixed(precision);
+  const [draft, setDraft] = useState(formatValue(value));
+  const [editing, setEditing] = useState(false);
+  const progress = ((value - min) / Math.max(max - min, 1)) * 100;
+
+  const updateNumber = (event: ChangeEvent<HTMLInputElement>) => {
+    const raw = event.target.value;
+    const next = Number(raw);
+    setDraft(raw);
+    if (raw !== "" && Number.isFinite(next) && next >= min && next <= max) {
+      onChange(next);
+    }
+  };
+
+  const commitNumber = () => {
+    setEditing(false);
+    const parsed = Number(draft);
+    const stepped = Number.isFinite(parsed)
+      ? Math.round(parsed / step) * step
+      : value;
+    const next = Math.min(max, Math.max(min, stepped));
+    onChange(next);
+    setDraft(formatValue(next));
+  };
+
+  const handleNumberKey = (event: KeyboardEvent<HTMLInputElement>) => {
+    if (event.key === "Enter") event.currentTarget.blur();
+  };
+
   return (
-    <span
-      className={`required-mark ${confirmed ? "is-confirmed" : ""}`}
-      title={confirmed ? "Confirmed by you" : "Using a population prior"}
+    <label
+      className="input-variable-pill streamlined-variable"
+      style={{ "--input-progress": `${progress}%` } as CSSProperties}
+      onPointerDown={(event) => event.stopPropagation()}
     >
-      {confirmed ? <BadgeCheck size={11} /> : <span />}
-      {confirmed ? "confirmed" : "required"}
-    </span>
+      <span className="streamlined-variable__label">
+        {label}
+        <i className={confirmed ? "is-confirmed" : ""} aria-hidden="true" />
+      </span>
+      <span className="input-variable-pill__number">
+        <input
+          type="number"
+          min={min}
+          max={max}
+          step={step}
+          value={editing ? draft : formatValue(value)}
+          onFocus={() => {
+            setDraft(formatValue(value));
+            setEditing(true);
+          }}
+          onChange={updateNumber}
+          onBlur={commitNumber}
+          onKeyDown={handleNumberKey}
+          aria-label={label}
+        />
+        <b>{unit}</b>
+      </span>
+      <input
+        className="input-variable-pill__range"
+        type="range"
+        min={min}
+        max={max}
+        step={step}
+        value={value}
+        onChange={(event) => onChange(Number(event.target.value))}
+        aria-label={`Adjust ${label}`}
+      />
+    </label>
+  );
+}
+
+type SelectVariableProps = {
+  label: string;
+  value: string;
+  confirmed?: boolean;
+  options: Array<{ value: string; label: string }>;
+  onChange: (value: string) => void;
+};
+
+function SelectVariable({
+  label,
+  value,
+  confirmed = false,
+  options,
+  onChange,
+}: SelectVariableProps) {
+  return (
+    <label
+      className="input-variable-pill streamlined-select-variable"
+      onPointerDown={(event) => event.stopPropagation()}
+    >
+      <span className="streamlined-variable__label">
+        {label}
+        <i className={confirmed ? "is-confirmed" : ""} aria-hidden="true" />
+      </span>
+      <select
+        value={value}
+        onChange={(event) => onChange(event.target.value)}
+        aria-label={label}
+      >
+        {options.map((option) => (
+          <option key={option.value} value={option.value}>
+            {option.label}
+          </option>
+        ))}
+      </select>
+    </label>
   );
 }
 
@@ -135,16 +269,10 @@ export function LabScreen({
 }: LabScreenProps) {
   const [projectionView, setProjectionView] = useState<
     "starting" | "projected"
-  >("starting");
-  const [intervalLevel, setIntervalLevel] =
-    useState<PredictionInterval["level"]>(80);
-  const [muscleInputsOpen, setMuscleInputsOpen] = useState(true);
-  const [workspaceMode, setWorkspaceMode] = useState<"inputs" | "projection">(
-    "inputs",
-  );
-  const [resultsView, setResultsView] = useState<
-    "body" | "muscles" | "validation"
-  >("body");
+  >("projected");
+  const [inputMode, setInputMode] = useState<InputMode>("training");
+  const [selectedMuscle, setSelectedMuscle] =
+    useState<MuscleGroupId>("chest");
 
   const confirmedInputs = useMemo(
     () => new Set(program.confirmedInputs ?? []),
@@ -154,6 +282,10 @@ export function LabScreen({
     () => new Set(program.confirmedMuscles ?? []),
     [program.confirmedMuscles],
   );
+  const completedInputCount =
+    REQUIRED_GLOBAL_INPUTS.filter((key) => confirmedInputs.has(key)).length +
+    Math.min(confirmedMuscles.size, MUSCLE_GROUPS.length);
+  const totalInputCount = REQUIRED_GLOBAL_INPUTS.length + MUSCLE_GROUPS.length;
 
   const confirmInput = (key: RequiredInputKey) => {
     onProgramChange((current) => ({
@@ -186,10 +318,9 @@ export function LabScreen({
     confirmInput("sex");
   };
 
-  const changeBodyFatMethod = (event: ChangeEvent<HTMLSelectElement>) => {
+  const changeBodyFatMethod = (value: string) => {
     const bodyFatMethod =
-      BODY_FAT_METHODS.find((method) => method.id === event.target.value)?.id ??
-      "unknown";
+      BODY_FAT_METHODS.find((method) => method.id === value)?.id ?? "unknown";
     onProgramChange((current) => ({
       ...current,
       bodyFatMethod,
@@ -208,13 +339,8 @@ export function LabScreen({
       ...current,
       muscles: {
         ...current.muscles,
-        [id]: {
-          ...current.muscles[id],
-          [field]: value,
-        },
+        [id]: { ...current.muscles[id], [field]: value },
       },
-      // Any edit invalidates the previous row acknowledgement. The complete
-      // exercise/dose row must be explicitly confirmed again below.
       confirmedMuscles: current.confirmedMuscles.filter(
         (muscleId) => muscleId !== id,
       ),
@@ -230,10 +356,6 @@ export function LabScreen({
     }));
   };
 
-  const selectedLeanInterval = getInterval(
-    result.leanGainIntervals,
-    intervalLevel,
-  );
   const startingDefinition = Math.min(
     1,
     Math.max(
@@ -242,730 +364,346 @@ export function LabScreen({
         (profile.bodyType === "male" ? 26 : 34),
     ),
   );
-  const visibleSignals =
-    projectionView === "projected" ? result.muscleSignals : ZERO_MUSCLE_SIGNALS;
+  const activeMuscle = program.muscles[selectedMuscle];
+  const muscle = MUSCLE_GROUPS.find(
+    (muscle) => muscle.id === selectedMuscle,
+  )!;
+
+  const renderMetric = (id: MetricId) => {
+    const metric = getMetric(id);
+    return (
+      <NumberVariable
+        key={metric.id}
+        label={metric.label}
+        value={program.values[metric.id]}
+        unit={metric.shortUnit}
+        min={metric.min}
+        max={metric.max}
+        step={metric.step}
+        confirmed={confirmedInputs.has(metric.id)}
+        onChange={(value) => changeMetric(metric.id, value)}
+      />
+    );
+  };
+
+  const renderMeasurement = (id: CharacterMeasurementId) => {
+    const measurement = CHARACTER_MEASUREMENTS.find((item) => item.id === id)!;
+    return (
+      <NumberVariable
+        key={measurement.id}
+        label={measurement.label}
+        value={profile.measurements[measurement.id]}
+        unit={measurement.unit}
+        min={measurement.min}
+        max={measurement.max}
+        step={measurement.step}
+        confirmed={confirmedInputs.has(measurement.id)}
+        onChange={(value) => changeMeasurement(measurement.id, value)}
+      />
+    );
+  };
+
+  const renderMuscleNumber = (
+    field: Exclude<keyof MuscleSetting, "exercise" | "priority">,
+  ) => {
+    const limits = MUSCLE_LIMITS[field];
+    return (
+      <NumberVariable
+        key={field}
+        label={limits.label}
+        value={activeMuscle[field]}
+        unit={limits.unit}
+        min={limits.min}
+        max={limits.max}
+        step={limits.step}
+        confirmed={confirmedMuscles.has(selectedMuscle)}
+        onChange={(value) => changeMuscle(selectedMuscle, field, value)}
+      />
+    );
+  };
 
   return (
-    <div className="lab-screen scientific-lab screen-enter">
-      <header className="screen-heading lab-heading">
+    <div className="lab-screen streamlined-lab screen-enter">
+      <header className="screen-heading lab-heading streamlined-lab__heading">
         <div>
-          <span className="eyebrow">Probabilistic physique model</span>
+          <span className="eyebrow">Anatomy studio · {MODEL_VERSION}</span>
           <h1>Physique Lab</h1>
-          <p>
-            A per-muscle estimate grounded in longitudinal resistance-training
-            cohorts, with uncertainty shown instead of hidden.
-          </p>
+          <p>Set the variables around the model, then compare the projection.</p>
         </div>
-        <div className="model-status-cluster">
-          <span className="estimate-badge">
-            <BrainCircuit size={14} />
-            {result.estimateLabel} · {result.modelVersion}
-          </span>
-          <span
-            className={`input-completeness ${
-              result.missingInputs.length === 0 ? "is-complete" : ""
-            }`}
-          >
-            {result.missingInputs.length === 0
-              ? "All required inputs confirmed"
-              : `${result.missingInputs.length} priors still in use`}
-          </span>
-        </div>
+        <span
+          className={`streamlined-completeness ${
+            result.missingInputs.length === 0 ? "is-complete" : ""
+          }`}
+        >
+          <BadgeCheck size={13} />
+          {completedInputCount}/{totalInputCount} inputs captured
+        </span>
       </header>
 
-      <nav className="workspace-mode-tabs" aria-label="Physique workspace view">
-        <button
-          type="button"
-          className={workspaceMode === "inputs" ? "is-active" : ""}
-          aria-pressed={workspaceMode === "inputs"}
-          onClick={() => setWorkspaceMode("inputs")}
-        >
-          <span>Inputs</span>
-          <small>Profile, measurements & training dose</small>
-        </button>
-        <button
-          type="button"
-          className={workspaceMode === "projection" ? "is-active" : ""}
-          aria-pressed={workspaceMode === "projection"}
-          onClick={() => setWorkspaceMode("projection")}
-        >
-          <span>Projection</span>
-          <small>3D model, intervals & validation</small>
-        </button>
-      </nav>
-
-      {workspaceMode === "projection" ? (
-        <section className="scientific-stage" data-testid="physique-stage">
-          <article className="scientific-stage__mesh">
-            <header>
-              <span>
-                <Activity size={13} />
-                Regional 3D projection
-              </span>
-              <small>Drag 360° · Scroll to zoom</small>
-            </header>
-            <div
-              className="projection-view-toggle scientific-view-toggle"
-              role="group"
-              aria-label="Character view"
-            >
-              <button
-                type="button"
-                className={projectionView === "starting" ? "is-active" : ""}
-                aria-pressed={projectionView === "starting"}
-                onClick={() => setProjectionView("starting")}
-              >
-                Starting body
-              </button>
-              <button
-                type="button"
-                className={projectionView === "projected" ? "is-active" : ""}
-                aria-pressed={projectionView === "projected"}
-                onClick={() => setProjectionView("projected")}
-              >
-                {result.durationWeeks}-week estimate
-              </button>
-            </div>
-            <div
-              className="scientific-character"
-              aria-label="3D character projection box"
-              data-projection-box
-            >
-              <CharacterScene
-                profile={profile}
-                growth={projectionView === "projected" ? result.growth : 0}
-                definition={
-                  projectionView === "projected"
-                    ? result.definition
-                    : startingDefinition
-                }
-                stimulus={projectionView === "projected" ? result.stimulus : 0}
-                baselineMuscularity={result.baselineMuscularity}
-                muscleSignals={visibleSignals}
-                reducedMotion={reducedMotion}
-                interactive
-              />
-            </div>
-            <button
-              className="mesh-adjust-button"
-              type="button"
-              onClick={() => onCharacterEditorOpenChange(true)}
-            >
-              <CircleGauge size={14} />
-              Appearance controls
-            </button>
-            <div className="mesh-calibration-note">
-              <Scale size={13} />
-              <span>
-                Mesh deltas use cube-root MRI volume conversion. Baseline
-                muscularity uses FFMI plus arm and thigh measurements.
-              </span>
-            </div>
-
-            <CharacterEditor
-              profile={profile}
-              open={characterEditorOpen}
-              onOpenChange={onCharacterEditorOpenChange}
-              onMeasurementChange={changeMeasurement}
-              onBodyTypeChange={changeSex}
-              onAppearanceChange={onAppearanceChange}
-              onReset={onResetCharacter}
-            />
-          </article>
-
-          <aside className="projection-summary-card">
-            <div className="projection-summary-card__heading">
-              <span className="card-kicker">
-                <Sparkles size={13} />
-                Posterior centre
-              </span>
-              <strong>
-                {formatSigned(result.estimatedLeanGainKg, 2)}
-                <small> kg skeletal muscle tissue</small>
-              </strong>
-              <p>{result.status}</p>
-            </div>
-
-            <div
-              className="interval-selector"
-              role="group"
-              aria-label="Prediction interval"
-            >
-              {([50, 80, 95, 99] as const).map((level) => (
-                <button
-                  key={level}
-                  type="button"
-                  className={intervalLevel === level ? "is-active" : ""}
-                  aria-pressed={intervalLevel === level}
-                  onClick={() => setIntervalLevel(level)}
-                >
-                  {level}%
-                </button>
-              ))}
-            </div>
-            <div className="selected-interval" data-testid="selected-interval">
-              <span>{intervalLevel}% prediction interval</span>
-              <strong>
-                {formatSigned(selectedLeanInterval.lower, 2)} to{" "}
-                {formatSigned(selectedLeanInterval.upper, 2)} kg
-              </strong>
-              <small>
-                Interval coverage target—not {intervalLevel}% point accuracy.
-              </small>
-            </div>
-
-            <div className="projection-stat-grid">
-              <span>
-                <small>Projected weight</small>
-                <b>{result.projectedWeightKg.toFixed(1)} kg</b>
-              </span>
-              <span>
-                <small>Projected body fat</small>
-                <b>{result.projectedBodyFatPct.toFixed(1)}%</b>
-              </span>
-              <span>
-                <small>Protein</small>
-                <b>{result.proteinPerKg.toFixed(2)} g/kg</b>
-              </span>
-              <span>
-                <small>Uncertainty</small>
-                <b>×{result.uncertaintyMultiplier.toFixed(2)}</b>
-              </span>
-            </div>
-
-            <div className="estimate-warning">
-              <AlertTriangle size={15} />
-              <p>
-                <strong>
-                  This is an estimate, not a diagnosis or promise.
-                </strong>
-                Genetics and true individual response remain latent until
-                repeated standardized measurements update the model.
-              </p>
-            </div>
-          </aside>
-        </section>
-      ) : null}
-
-      {workspaceMode === "inputs" ? (
-        <>
-          <section
-            className="input-section"
-            aria-labelledby="required-inputs-title"
-          >
-            <header className="section-title-row">
-              <div>
-                <span className="card-kicker">Required model inputs</span>
-                <h2 id="required-inputs-title">Profile, intake and recovery</h2>
-              </div>
-              <p>
-                Defaults are population priors. Touch each field to confirm your
-                value and narrow uncertainty.
-              </p>
-            </header>
-
-            <div className="required-input-layout">
-              <article className="input-panel">
-                <h3>Demographics & plan</h3>
-                <div className="sex-control">
-                  <span>
-                    Sex
-                    <RequiredMark confirmed={confirmedInputs.has("sex")} />
-                  </span>
-                  <div role="group" aria-label="Sex">
-                    {(["male", "female"] as const).map((bodyType) => (
-                      <button
-                        key={bodyType}
-                        type="button"
-                        className={
-                          profile.bodyType === bodyType ? "is-active" : ""
-                        }
-                        aria-pressed={profile.bodyType === bodyType}
-                        onClick={() => changeSex(bodyType)}
-                      >
-                        {bodyType === "male" ? "Male" : "Female"}
-                      </button>
-                    ))}
-                  </div>
-                </div>
-                <div className="compact-input-grid">
-                  {GLOBAL_METRICS.map((id) => {
-                    const definition = METRICS.find(
-                      (candidate) => candidate.id === id,
-                    )!;
-                    return (
-                      <label key={id} className="scientific-number-input">
-                        <span>
-                          {definition.label}
-                          <RequiredMark confirmed={confirmedInputs.has(id)} />
-                        </span>
-                        <div>
-                          <input
-                            type="number"
-                            min={definition.min}
-                            max={definition.max}
-                            step={definition.step}
-                            value={program.values[id]}
-                            onChange={(event) =>
-                              changeMetric(id, Number(event.target.value))
-                            }
-                            aria-label={definition.label}
-                          />
-                          <small>{definition.shortUnit}</small>
-                        </div>
-                      </label>
-                    );
-                  })}
-                </div>
-              </article>
-
-              <article className="input-panel">
-                <h3>Body measurements</h3>
-                <div className="compact-input-grid">
-                  {BODY_MEASUREMENTS.map((measurement) => (
-                    <label
-                      key={measurement.id}
-                      className="scientific-number-input"
-                    >
-                      <span>
-                        {measurement.label}
-                        <RequiredMark
-                          confirmed={confirmedInputs.has(measurement.id)}
-                        />
-                      </span>
-                      <div>
-                        <input
-                          type="number"
-                          step={measurement.step}
-                          value={profile.measurements[measurement.id]}
-                          onChange={(event) =>
-                            changeMeasurement(
-                              measurement.id,
-                              Number(event.target.value),
-                            )
-                          }
-                          aria-label={measurement.label}
-                        />
-                        <small>{measurement.unit}</small>
-                      </div>
-                    </label>
-                  ))}
-                  <label className="scientific-number-input scientific-select-input">
-                    <span>
-                      Body-fat method
-                      <RequiredMark
-                        confirmed={confirmedInputs.has("bodyFatMethod")}
-                      />
-                    </span>
-                    <select
-                      value={program.bodyFatMethod}
-                      onChange={changeBodyFatMethod}
-                      aria-label="Body-fat method"
-                    >
-                      {BODY_FAT_METHODS.map((method) => (
-                        <option key={method.id} value={method.id}>
-                          {method.label} (±{method.typicalErrorPct}% typical)
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                </div>
-              </article>
-            </div>
-          </section>
-
-          <section className="input-section muscle-dose-section">
-            <header className="section-title-row">
-              <div>
-                <span className="card-kicker">Per-muscle exposure</span>
-                <h2>Exercises and weekly dose</h2>
-              </div>
-              <button
-                type="button"
-                className="section-collapse-button"
-                aria-expanded={muscleInputsOpen}
-                onClick={() => setMuscleInputsOpen((open) => !open)}
-              >
-                {confirmedMuscles.size}/{MUSCLE_GROUPS.length} confirmed
-                <ChevronDown
-                  size={14}
-                  className={muscleInputsOpen ? "is-open" : ""}
-                />
-              </button>
-            </header>
-
-            {muscleInputsOpen ? (
-              <div
-                className="muscle-dose-table"
-                role="table"
-                aria-label="Per-muscle training inputs"
-              >
-                <div
-                  className="muscle-dose-row muscle-dose-row--head"
-                  role="row"
-                >
-                  <span>Muscle / exercise</span>
-                  <span>Direct sets</span>
-                  <span>Indirect sets</span>
-                  <span>Reps</span>
-                  <span>RIR</span>
-                  <span>Frequency</span>
-                  <span>Status</span>
-                </div>
-                {MUSCLE_GROUPS.map((muscle) => {
-                  const setting = program.muscles[muscle.id];
-                  return (
-                    <div
-                      key={muscle.id}
-                      className={`muscle-dose-row ${
-                        confirmedMuscles.has(muscle.id) ? "is-confirmed" : ""
-                      }`}
-                      role="row"
-                    >
-                      <label className="muscle-exercise-input">
-                        <span>
-                          <i style={{ background: muscle.color }} />
-                          {muscle.label}
-                          <RequiredMark
-                            confirmed={confirmedMuscles.has(muscle.id)}
-                          />
-                        </span>
-                        <input
-                          type="text"
-                          value={setting.exercise}
-                          onChange={(event) =>
-                            changeMuscle(
-                              muscle.id,
-                              "exercise",
-                              event.target.value,
-                            )
-                          }
-                          aria-label={`${muscle.label} exercise`}
-                        />
-                      </label>
-                      {MUSCLE_NUMBER_FIELDS.map((field) => (
-                        <label key={field}>
-                          <span className="mobile-field-label">
-                            {field === "sets"
-                              ? "Direct sets"
-                              : field === "indirectSets"
-                                ? "Indirect sets"
-                                : field === "frequency"
-                                  ? "Frequency"
-                                  : field.toUpperCase()}
-                          </span>
-                          <input
-                            type="number"
-                            min={
-                              field === "rir" ||
-                              field.includes("Sets") ||
-                              field === "sets"
-                                ? 0
-                                : 1
-                            }
-                            max={
-                              field === "rir"
-                                ? 8
-                                : field === "frequency"
-                                  ? 7
-                                  : field === "reps"
-                                    ? 50
-                                    : 40
-                            }
-                            step={1}
-                            value={setting[field]}
-                            onChange={(event) =>
-                              changeMuscle(
-                                muscle.id,
-                                field,
-                                Math.max(0, Number(event.target.value)),
-                              )
-                            }
-                            aria-label={`${muscle.label} ${field}`}
-                          />
-                        </label>
-                      ))}
-                      <button
-                        type="button"
-                        className="confirm-muscle-row"
-                        disabled={confirmedMuscles.has(muscle.id)}
-                        onClick={() => confirmMuscle(muscle.id)}
-                        aria-label={`Confirm ${muscle.label} inputs`}
-                      >
-                        {confirmedMuscles.has(muscle.id)
-                          ? "Confirmed"
-                          : "Confirm row"}
-                      </button>
-                    </div>
-                  );
-                })}
-              </div>
-            ) : null}
-            <p className="dose-method-note">
-              Direct sets receive full dose. Indirect sets use a conservative,
-              uncertainty-bearing 0.4 effective-set prior; frequency distributes
-              volume but is not awarded an independent hypertrophy bonus.
-            </p>
-          </section>
-        </>
-      ) : null}
-
-      {workspaceMode === "projection" ? (
-        <section className="results-workspace" aria-label="Projection results">
-          <header className="results-workspace__header">
+      <section className="lab-workspace">
+        <article className="lab-stage-card streamlined-lab-stage">
+          <header>
             <div>
-              <span className="card-kicker">Model output</span>
-              <h2>Explore the estimate</h2>
+              <Activity size={13} aria-hidden="true" />
+              Live projection
             </div>
-            <div
-              className="results-view-tabs"
-              role="group"
-              aria-label="Projection result view"
-            >
-              <button
-                type="button"
-                className={resultsView === "body" ? "is-active" : ""}
-                aria-pressed={resultsView === "body"}
-                onClick={() => setResultsView("body")}
-              >
-                Body composition
-              </button>
-              <button
-                type="button"
-                className={resultsView === "muscles" ? "is-active" : ""}
-                aria-pressed={resultsView === "muscles"}
-                onClick={() => setResultsView("muscles")}
-              >
-                Regional muscles
-              </button>
-              <button
-                type="button"
-                className={resultsView === "validation" ? "is-active" : ""}
-                aria-pressed={resultsView === "validation"}
-                onClick={() => setResultsView("validation")}
-              >
-                Validation &amp; evidence
-              </button>
-            </div>
+            <span>Drag 360° · Scroll to zoom</span>
           </header>
 
-          {resultsView === "body" ? (
-            <section
-              className="results-section"
-              aria-labelledby="projection-results-title"
+          <div
+            className="projection-view-toggle"
+            role="group"
+            aria-label="Character view"
+          >
+            <button
+              type="button"
+              className={projectionView === "starting" ? "is-active" : ""}
+              aria-pressed={projectionView === "starting"}
+              onClick={() => setProjectionView("starting")}
             >
-              <header className="section-title-row">
-                <div>
-                  <span className="card-kicker">Posterior decomposition</span>
-                  <h2 id="projection-results-title">
-                    What the scale change contains
-                  </h2>
-                </div>
-                <p>Fat, muscle tissue, glycogen and water are not conflated.</p>
-              </header>
-              <div className="component-grid">
-                {result.components.map((component) => (
-                  <article
-                    key={component.id}
-                    className={`component-card component-card--${component.id}`}
+              Starting body
+            </button>
+            <button
+              type="button"
+              className={projectionView === "projected" ? "is-active" : ""}
+              aria-pressed={projectionView === "projected"}
+              onClick={() => setProjectionView("projected")}
+            >
+              Projected · {result.durationWeeks} weeks
+            </button>
+          </div>
+
+          <div
+            className="lab-character"
+            aria-label="3D character projection box"
+            data-projection-box
+          >
+            <CharacterScene
+              profile={profile}
+              growth={projectionView === "projected" ? result.growth : 0}
+              definition={
+                projectionView === "projected"
+                  ? result.definition
+                  : startingDefinition
+              }
+              stimulus={projectionView === "projected" ? result.stimulus : 0}
+              baselineMuscularity={result.baselineMuscularity}
+              muscleSignals={
+                projectionView === "projected" ? result.muscleSignals : {}
+              }
+              reducedMotion={reducedMotion}
+              interactive
+            />
+          </div>
+
+          <button
+            className="mesh-adjust-button streamlined-adjust-button"
+            type="button"
+            onClick={() => onCharacterEditorOpenChange(true)}
+          >
+            <CircleGauge size={14} />
+            Appearance
+          </button>
+
+          <CharacterEditor
+            profile={profile}
+            open={characterEditorOpen}
+            onOpenChange={onCharacterEditorOpenChange}
+            onMeasurementChange={changeMeasurement}
+            onBodyTypeChange={changeSex}
+            onAppearanceChange={onAppearanceChange}
+            onReset={onResetCharacter}
+          />
+
+          <section
+            className="streamlined-input-layer"
+            aria-labelledby="projection-inputs-title"
+          >
+            <header className="streamlined-input-toolbar">
+              <span id="projection-inputs-title">
+                <SlidersHorizontal size={12} />
+                Input variables
+              </span>
+              <div role="tablist" aria-label="Input groups">
+                {(
+                  [
+                    ["training", "Training"],
+                    ["body", "Body"],
+                    ["muscle", "Per muscle"],
+                  ] as const
+                ).map(([mode, label]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    role="tab"
+                    aria-selected={inputMode === mode}
+                    className={inputMode === mode ? "is-active" : ""}
+                    onClick={() => setInputMode(mode)}
                   >
-                    <span>
-                      {component.id === "water" ||
-                      component.id === "glycogen" ? (
-                        <Droplets size={15} />
-                      ) : (
-                        <BarChart3 size={15} />
-                      )}
-                      {component.label}
-                    </span>
-                    <strong>{formatSigned(component.changeKg, 2)} kg</strong>
-                    <small>
-                      {component.startingKg.toFixed(1)} →{" "}
-                      {component.projectedKg.toFixed(1)} kg · uncertainty ±
-                      {component.uncertaintyKg.toFixed(1)}
-                    </small>
-                  </article>
+                    {label}
+                  </button>
                 ))}
               </div>
-            </section>
-          ) : null}
-
-          {resultsView === "muscles" ? (
-            <section className="results-section">
-              <header className="section-title-row">
-                <div>
-                  <span className="card-kicker">Regional posterior</span>
-                  <h2>Per-muscle hypertrophy</h2>
-                </div>
-                <p>
-                  {intervalLevel}% intervals include responder and measurement
-                  variability.
-                </p>
-              </header>
-              <div className="muscle-result-table">
-                <div className="muscle-result-row muscle-result-row--head">
-                  <span>Muscle</span>
-                  <span>Effective sets</span>
-                  <span>Mean estimate</span>
-                  <span>{intervalLevel}% interval</span>
-                  <span>Mesh radius</span>
-                </div>
-                {MUSCLE_GROUPS.map((muscle) => {
-                  const projection = result.muscleProjections[muscle.id];
-                  const interval = getInterval(
-                    projection.intervals,
-                    intervalLevel,
-                  );
-                  return (
-                    <div key={muscle.id} className="muscle-result-row">
-                      <span>
-                        <i style={{ background: muscle.color }} />
-                        <b>{muscle.label}</b>
-                        <small>{projection.evidenceGrade} evidence</small>
-                      </span>
-                      <span>{projection.effectiveSets.toFixed(1)}</span>
-                      <span>{formatSigned(projection.meanPercent, 1)}%</span>
-                      <span>
-                        {formatSigned(interval.lower, 1)} to{" "}
-                        {formatSigned(interval.upper, 1)}%
-                      </span>
-                      <span>
-                        {formatSigned(projection.radialMeshChange * 100, 2)}%
-                      </span>
-                    </div>
-                  );
-                })}
-              </div>
-            </section>
-          ) : null}
-
-          {resultsView === "validation" ? (
-            <section
-              className="validation-section"
-              data-testid="model-validation"
-            >
-              <article className="validation-card">
-                <header>
-                  <span className="card-kicker">
-                    <BarChart3 size={13} />
-                    Held-out validation
-                  </span>
-                  <h2>Study-level performance on unseen cohorts</h2>
-                  <p>{result.validation.scope}</p>
-                </header>
-                <div className="validation-metric-grid">
-                  <span>
-                    <small>MAE</small>
-                    <b>{result.validation.maePercentPoints.toFixed(2)} pp</b>
-                    <em>regional hypertrophy</em>
-                  </span>
-                  <span>
-                    <small>Mean bias</small>
-                    <b>
-                      {formatSigned(result.validation.meanBiasPercentPoints, 2)}{" "}
-                      pp
-                    </b>
-                    <em>predicted − observed</em>
-                  </span>
-                  <span>
-                    <small>Calibration error</small>
-                    <b>
-                      {result.validation.calibrationErrorPercentPoints.toFixed(
-                        1,
-                      )}{" "}
-                      pp
-                    </b>
-                    <em>mean coverage gap</em>
-                  </span>
-                  <span>
-                    <small>Holdout sample</small>
-                    <b>{result.validation.holdoutCohorts} cohorts</b>
-                    <em>
-                      {result.validation.participants} participant-records
-                    </em>
-                  </span>
-                </div>
-                <div className="coverage-grid">
-                  {result.validation.coverage.map((coverage) => (
-                    <span key={coverage.level}>
-                      <small>{coverage.level}% target</small>
-                      <b>{coverage.observed.toFixed(1)}% observed</b>
-                      <i>
-                        <span
-                          style={{
-                            width: `${Math.min(100, coverage.observed)}%`,
-                          }}
-                        />
-                      </i>
-                    </span>
+              {inputMode === "muscle" ? (
+                <select
+                  className="streamlined-muscle-select"
+                  value={selectedMuscle}
+                  onChange={(event) =>
+                    setSelectedMuscle(event.target.value as MuscleGroupId)
+                  }
+                  aria-label="Muscle group"
+                >
+                  {MUSCLE_GROUPS.map((muscle) => (
+                    <option key={muscle.id} value={muscle.id}>
+                      {muscle.label}
+                    </option>
                   ))}
-                </div>
-                <div className="validation-honesty">
-                  <AlertTriangle size={15} />
-                  <p>
-                    A cohort-level MAE cannot be translated into personal point
-                    accuracy. The 99% output is deliberately an interval, never
-                    a claim that one number is 99% correct.
-                  </p>
-                </div>
-              </article>
-
-              <article className="evidence-card">
-                <header>
-                  <span className="card-kicker">
-                    <BookOpen size={13} />
-                    Evidence map
-                  </span>
-                  <h2>Longitudinal anchors</h2>
-                  <p>
-                    Primary studies are separated by the role they play in the
-                    estimator.
-                  </p>
-                </header>
-                <div>
-                  {MODEL_SOURCES.map((source) => (
-                    <a
-                      key={source.id}
-                      href={source.url}
-                      target="_blank"
-                      rel="noreferrer"
-                    >
-                      <span>{source.label}</span>
-                      <small>{source.role}</small>
-                    </a>
-                  ))}
-                </div>
-              </article>
-            </section>
-          ) : null}
-        </section>
-      ) : null}
-
-      {workspaceMode === "inputs" && result.missingInputs.length > 0 ? (
-        <section className="missing-input-banner">
-          <AlertTriangle size={16} />
-          <div>
-            <strong>Estimate widened for unconfirmed inputs</strong>
-            <p>{result.guidance}</p>
-            <div>
-              {result.missingInputs.slice(0, 8).map((input) => (
-                <span key={input}>{input}</span>
-              ))}
-              {result.missingInputs.length > 8 ? (
-                <span>+{result.missingInputs.length - 8} more</span>
+                </select>
               ) : null}
-            </div>
-          </div>
-        </section>
-      ) : workspaceMode === "inputs" ? (
-        <section className="missing-input-banner is-complete">
-          <BadgeCheck size={17} />
-          <div>
-            <strong>Required input set complete</strong>
-            <p>{result.guidance}</p>
-          </div>
-        </section>
-      ) : null}
+            </header>
+
+            {inputMode === "training" ? (
+              <div className="streamlined-input-columns">
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    Plan variables
+                  </span>
+                  {TRAINING_INPUT_IDS.map(renderMetric)}
+                </div>
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    Fuel & recovery
+                  </span>
+                  {RECOVERY_INPUT_IDS.map(renderMetric)}
+                </div>
+              </div>
+            ) : null}
+
+            {inputMode === "body" ? (
+              <div className="streamlined-input-columns">
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    Body profile
+                  </span>
+                  <SelectVariable
+                    label="Sex"
+                    value={profile.bodyType}
+                    confirmed={confirmedInputs.has("sex")}
+                    options={[
+                      { value: "male", label: "Male" },
+                      { value: "female", label: "Female" },
+                    ]}
+                    onChange={(value) => changeSex(value as CharacterBodyType)}
+                  />
+                  {(["heightCm", "weightKg", "bodyFatPct"] as const).map(
+                    renderMeasurement,
+                  )}
+                  <SelectVariable
+                    label="Body-fat method"
+                    value={program.bodyFatMethod}
+                    confirmed={confirmedInputs.has("bodyFatMethod")}
+                    options={BODY_FAT_METHODS.map((method) => ({
+                      value: method.id,
+                      label: method.label,
+                    }))}
+                    onChange={changeBodyFatMethod}
+                  />
+                </div>
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    Circumferences
+                  </span>
+                  {(
+                    [
+                      "waistCm",
+                      "neckCm",
+                      "chestCm",
+                      "upperArmCm",
+                      "thighCm",
+                      "hipCm",
+                    ] as const
+                  ).map(renderMeasurement)}
+                </div>
+              </div>
+            ) : null}
+
+            {inputMode === "muscle" ? (
+              <div className="streamlined-input-columns">
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    {muscle.label} dose
+                  </span>
+                  <label className="input-variable-pill streamlined-text-variable">
+                    <span>Exercise</span>
+                    <input
+                      type="text"
+                      value={activeMuscle.exercise}
+                      onChange={(event) =>
+                        changeMuscle(
+                          selectedMuscle,
+                          "exercise",
+                          event.target.value,
+                        )
+                      }
+                      aria-label={`${muscle.label} exercise`}
+                    />
+                  </label>
+                  {renderMuscleNumber("sets")}
+                  {renderMuscleNumber("indirectSets")}
+                </div>
+                <div className="streamlined-input-column">
+                  <span className="input-variable-column__label">
+                    Set details
+                  </span>
+                  {renderMuscleNumber("reps")}
+                  {renderMuscleNumber("rir")}
+                  {renderMuscleNumber("frequency")}
+                  <SelectVariable
+                    label="Priority"
+                    value={String(activeMuscle.priority)}
+                    confirmed={confirmedMuscles.has(selectedMuscle)}
+                    options={[
+                      { value: "1", label: "Standard" },
+                      { value: "2", label: "High" },
+                      { value: "3", label: "Highest" },
+                    ]}
+                    onChange={(value) =>
+                      changeMuscle(
+                        selectedMuscle,
+                        "priority",
+                        Number(value) as MusclePriority,
+                      )
+                    }
+                  />
+                  <button
+                    type="button"
+                    className={`streamlined-confirm-button ${
+                      confirmedMuscles.has(selectedMuscle)
+                        ? "is-confirmed"
+                        : ""
+                    }`}
+                    onClick={() => confirmMuscle(selectedMuscle)}
+                    disabled={confirmedMuscles.has(selectedMuscle)}
+                  >
+                    <BadgeCheck size={13} />
+                    {confirmedMuscles.has(selectedMuscle)
+                      ? "Dose confirmed"
+                      : `Confirm ${muscle.label} inputs`}
+                  </button>
+                </div>
+              </div>
+            ) : null}
+
+            <p className="streamlined-input-note">
+              {result.missingInputs.length === 0
+                ? "All required inputs are captured."
+                : `${result.missingInputs.length} required input${
+                    result.missingInputs.length === 1 ? "" : "s"
+                  } still use population priors.`}
+            </p>
+          </section>
+        </article>
+      </section>
     </div>
   );
 }

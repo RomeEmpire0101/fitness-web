@@ -5142,3 +5142,375 @@ select:focus-visible,
     grid-template-columns: 1fr;
   }
 }
+
+/* Streamlined input-first physique workspace */
+
+.streamlined-lab {
+  width: min(1320px, 100%);
+}
+
+.streamlined-lab__heading {
+  margin-bottom: 20px;
+}
+
+.streamlined-completeness {
+  display: inline-flex;
+  min-height: 32px;
+  flex: 0 0 auto;
+  align-items: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid #e6dcd7;
+  border-radius: 999px;
+  color: #906958;
+  background: rgba(255, 249, 246, 0.78);
+  font-size: 7px;
+  font-weight: 750;
+}
+
+.streamlined-completeness.is-complete {
+  color: #287d60;
+  border-color: #d5e7de;
+  background: rgba(245, 251, 248, 0.8);
+}
+
+.streamlined-lab-stage {
+  min-height: 800px;
+}
+
+.streamlined-lab-stage .lab-character {
+  inset: 42px 13% 0;
+}
+
+.streamlined-adjust-button {
+  top: 58px;
+  right: 20px;
+  bottom: auto;
+}
+
+.streamlined-input-layer {
+  position: absolute;
+  z-index: 10;
+  inset: 52px 22px 18px;
+  pointer-events: none;
+}
+
+.streamlined-input-toolbar {
+  position: absolute;
+  z-index: 4;
+  bottom: 0;
+  left: 50%;
+  display: flex;
+  min-height: 38px;
+  align-items: center;
+  gap: 8px;
+  padding: 4px;
+  border: 1px solid rgba(35, 37, 42, 0.11);
+  border-radius: 999px;
+  background: rgba(255, 255, 255, 0.88);
+  box-shadow: 0 9px 24px rgba(42, 40, 55, 0.09);
+  backdrop-filter: blur(18px);
+  -webkit-backdrop-filter: blur(18px);
+  transform: translateX(-50%);
+  pointer-events: auto;
+}
+
+.streamlined-input-toolbar > span {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 0 7px 0 9px;
+  color: #5f6168;
+  font-size: 7px;
+  font-weight: 800;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  white-space: nowrap;
+}
+
+.streamlined-input-toolbar > div {
+  display: flex;
+  gap: 2px;
+  padding: 2px;
+  border-radius: 999px;
+  background: #efeff3;
+}
+
+.streamlined-input-toolbar button {
+  min-height: 27px;
+  padding: 0 10px;
+  border: 0;
+  border-radius: 999px;
+  color: #747680;
+  background: transparent;
+  font-size: 7px;
+  font-weight: 750;
+  white-space: nowrap;
+}
+
+.streamlined-input-toolbar button.is-active {
+  color: #fff;
+  background: #292932;
+  box-shadow: 0 4px 10px rgba(35, 36, 42, 0.14);
+}
+
+.streamlined-muscle-select {
+  max-width: 118px;
+  height: 29px;
+  padding: 0 23px 0 9px;
+  border: 1px solid #dfdee5;
+  border-radius: 999px;
+  outline: 0;
+  background: #fafafd;
+  font-size: 7px;
+  font-weight: 700;
+}
+
+.streamlined-input-columns {
+  position: absolute;
+  inset: 54px 0 68px;
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  pointer-events: none;
+}
+
+.streamlined-input-column {
+  display: grid;
+  width: 188px;
+  max-height: 100%;
+  gap: 8px;
+  padding: 2px;
+  overflow-x: hidden;
+  overflow-y: auto;
+  overscroll-behavior: contain;
+  scrollbar-width: none;
+  pointer-events: auto;
+}
+
+.streamlined-input-column::-webkit-scrollbar {
+  display: none;
+}
+
+.streamlined-variable {
+  min-height: 78px;
+  flex: 0 0 auto;
+  padding: 9px 11px 8px;
+  border-radius: 18px;
+}
+
+.streamlined-variable__label {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+}
+
+.streamlined-variable__label i {
+  width: 5px;
+  height: 5px;
+  flex: 0 0 auto;
+  border-radius: 50%;
+  background: #d98a6f;
+}
+
+.streamlined-variable__label i.is-confirmed {
+  background: var(--green);
+}
+
+.streamlined-select-variable,
+.streamlined-text-variable {
+  min-height: 61px;
+  gap: 8px;
+  padding: 10px 11px;
+  border-radius: 18px;
+}
+
+.streamlined-select-variable select,
+.streamlined-text-variable input {
+  width: 100%;
+  height: 29px;
+  padding: 0 8px;
+  border: 1px solid rgba(37, 38, 43, 0.14);
+  border-radius: 9px;
+  outline: 0;
+  color: #2a2b30;
+  background: rgba(250, 250, 252, 0.92);
+  font-size: 8px;
+  font-weight: 700;
+}
+
+.streamlined-select-variable select:focus,
+.streamlined-text-variable input:focus {
+  border-color: #9f98df;
+}
+
+.streamlined-confirm-button {
+  display: inline-flex;
+  min-height: 38px;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 0 11px;
+  border: 1px solid #d9d6e6;
+  border-radius: 13px;
+  color: #544d8e;
+  background: rgba(244, 242, 255, 0.92);
+  box-shadow: 0 8px 20px rgba(42, 40, 55, 0.06);
+  font-size: 7px;
+  font-weight: 800;
+  pointer-events: auto;
+}
+
+.streamlined-confirm-button.is-confirmed {
+  color: #287d60;
+  border-color: #cce5da;
+  background: rgba(241, 250, 246, 0.94);
+}
+
+.streamlined-input-note {
+  position: absolute;
+  right: 195px;
+  bottom: 49px;
+  left: 195px;
+  margin: 0;
+  color: #8a8c95;
+  font-size: 6px;
+  line-height: 1.4;
+  text-align: center;
+}
+
+@media (max-width: 980px) {
+  .streamlined-lab-stage .lab-character {
+    inset-inline: 11%;
+  }
+
+  .streamlined-input-column {
+    width: 170px;
+  }
+
+  .streamlined-input-note {
+    right: 176px;
+    left: 176px;
+  }
+}
+
+@media (max-width: 760px) {
+  .streamlined-lab__heading {
+    align-items: flex-start;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .streamlined-lab-stage {
+    min-height: 0;
+    padding-bottom: 16px;
+    overflow: visible;
+  }
+
+  .streamlined-lab-stage > header {
+    position: relative;
+    top: auto;
+    right: auto;
+    left: auto;
+    min-height: 46px;
+    padding: 0 14px;
+  }
+
+  .streamlined-lab-stage > header > span {
+    display: none;
+  }
+
+  .streamlined-lab-stage .projection-view-toggle {
+    position: relative;
+    top: auto;
+    left: auto;
+    width: fit-content;
+    margin: 0 auto;
+    transform: none;
+  }
+
+  .streamlined-lab-stage .lab-character {
+    position: relative;
+    inset: auto;
+    height: 500px;
+    margin-top: 4px;
+  }
+
+  .streamlined-adjust-button {
+    top: 98px;
+    right: 12px;
+    bottom: auto;
+  }
+
+  .streamlined-input-layer {
+    position: relative;
+    inset: auto;
+    padding: 0 14px;
+    margin-top: 6px;
+    pointer-events: auto;
+  }
+
+  .streamlined-input-toolbar {
+    position: relative;
+    bottom: auto;
+    left: auto;
+    flex-wrap: wrap;
+    justify-content: center;
+    border-radius: 18px;
+    transform: none;
+  }
+
+  .streamlined-input-toolbar > span {
+    width: 100%;
+    justify-content: center;
+    padding-top: 5px;
+  }
+
+  .streamlined-input-columns {
+    position: relative;
+    inset: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+    margin-top: 13px;
+  }
+
+  .streamlined-input-column {
+    width: auto;
+    max-height: none;
+    overflow: visible;
+  }
+
+  .streamlined-input-note {
+    position: relative;
+    right: auto;
+    bottom: auto;
+    left: auto;
+    margin: 11px 0 0;
+  }
+}
+
+@media (max-width: 500px) {
+  .streamlined-lab-stage .lab-character {
+    height: 440px;
+  }
+
+  .streamlined-input-toolbar > div {
+    width: 100%;
+  }
+
+  .streamlined-input-toolbar button {
+    flex: 1;
+  }
+
+  .streamlined-muscle-select {
+    max-width: none;
+    width: calc(100% - 8px);
+    margin-bottom: 3px;
+  }
+
+  .streamlined-input-columns {
+    grid-template-columns: 1fr;
+  }
+}
