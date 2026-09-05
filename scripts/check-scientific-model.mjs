@@ -127,11 +127,18 @@ assert(
   "Set-dose response must show nonlinear diminishing returns.",
 );
 
-const labSource = await import("node:fs/promises").then(({ readFile }) =>
-  readFile(new URL("../src/components/lab/LabScreen.tsx", import.meta.url), "utf8"),
+const { readFile } = await import("node:fs/promises");
+const labSource = await readFile(
+  new URL("../src/components/lab/LabScreen.tsx", import.meta.url),
+  "utf8",
+);
+const doseSource = await readFile(
+  new URL("../src/components/lab/DoseCard.tsx", import.meta.url),
+  "utf8",
 );
 assert(
-  labSource.includes("Confirm ${muscle.label} inputs") &&
+  doseSource.includes("Confirm ${muscle.label") &&
+    doseSource.includes("disabled={confirmed}") &&
     labSource.includes("current.confirmedMuscles.filter("),
   "Muscle-dose rows must require explicit confirmation and invalidate it after edits.",
 );
