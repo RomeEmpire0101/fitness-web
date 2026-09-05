@@ -10,6 +10,7 @@
     "start": "vinext start",
     "dev:next": "next dev --webpack",
     "build:next": "next build --webpack",
+    "build:vercel": "npm run check:model && npm run check:anatomy && next build --webpack",
     "lint": "eslint .",
     "typecheck": "tsc --noEmit --incremental false",
     "dev:vinext": "vinext dev --port 3001",

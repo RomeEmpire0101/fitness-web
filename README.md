@@ -70,6 +70,7 @@ The dev server runs on http://localhost:3000.
 | `npm run check:model` | Holdout validation of the scientific model |
 | `npm run check:anatomy` | Anatomy deformation safety bounds |
 | `npm run dev:next` / `build:next` | Alternate Next.js/webpack path, kept as a fallback |
+| `npm run build:vercel` | Both gates, then a standard Next.js build — what Vercel runs |
 | `npm run deploy:vinext` | Deploys the Cloudflare Worker build |
 
 ### Build gates
@@ -124,10 +125,24 @@ The `@/*` path alias maps to `src/*`.
 
 ## Deployment
 
-The build targets Cloudflare Workers via `wrangler.jsonc` (assets served from
-`dist/client`, `nodejs_compat` enabled). `scripts/prepare-sites-build.mjs`
-copies `.openai/hosting.json` into `dist/` so the same build can be published
-through Sites.
+This repo supports two deployment targets, and they need different builds.
+
+**Cloudflare Workers (primary).** `npm run build` runs `vinext build`, which
+emits `dist/client` and `dist/server` against `wrangler.jsonc`
+(`nodejs_compat` enabled). `scripts/prepare-sites-build.mjs` then copies
+`.openai/hosting.json` into `dist/` so the same build can be published through
+Sites. Deploy with `npm run deploy:vinext`.
+
+**Vercel.** Vercel expects a `.next` directory, which `vinext build` never
+produces — pointing it at the default `build` script fails with
+`routes-manifest.json couldn't be found`. `vercel.json` therefore overrides
+the build command to `npm run build:vercel`, a standard `next build` behind the
+same two gates. Nothing else about the Vercel project needs configuring; leave
+the Output Directory setting empty so the `nextjs` framework default applies.
+
+Both paths build the same `src/`. If you add a Workers-only API (KV, D1,
+Durable Objects), the Vercel build will compile but that feature will not work
+there.
 
 ## Documentation
 
