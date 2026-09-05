@@ -13,6 +13,12 @@ Model version: `FF-HBM 1.0`
 
 ## What it does
 
+- **The body is the navigation.** Each of the 11 muscle groups has a callout
+  beside the 3D figure showing its projected volume change and 80% interval,
+  joined to the region by a leader line that follows rotation and zoom.
+  Clicking a callout, or the muscle itself on the body, opens that group's
+  weekly dose. The 18 global inputs sit as chips in the top strip; the headline
+  estimate and its full breakdown sit bottom-left.
 - **Per-muscle projection.** 11 muscle groups (chest, back, shoulders, biceps,
   triceps, forearms, core, quads, hamstrings, glutes, calves), each with its own
   regional hypertrophy distribution driven by exercise selection, direct and

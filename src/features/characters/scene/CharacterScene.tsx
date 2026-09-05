@@ -5,22 +5,17 @@ import { Canvas } from "@react-three/fiber";
 import { useMemo } from "react";
 import * as THREE from "three";
 import { deriveCharacterMorphology } from "../morphology";
-import {
-  CharacterProfile,
-  CharacterVisualization,
-} from "../types";
+import { CharacterModelProps } from "./CharacterModel";
 import { RegisteredCharacterModel } from "./characterRegistry";
 import { SceneLighting } from "./SceneLighting";
 
-export type CharacterSceneProps = CharacterVisualization & {
-  profile: CharacterProfile;
+export type CharacterSceneProps = CharacterModelProps & {
   compact?: boolean;
   interactive?: boolean;
 };
 
 export default function CharacterScene(props: CharacterSceneProps) {
-  const compact = props.compact ?? false;
-  const interactive = props.interactive ?? true;
+  const { compact = false, interactive = true, ...modelProps } = props;
   const morphology = useMemo(
     () => deriveCharacterMorphology(props.profile.measurements),
     [props.profile.measurements],
@@ -43,7 +38,7 @@ export default function CharacterScene(props: CharacterSceneProps) {
     <Canvas
       aria-label={
         interactive
-          ? "Interactive 3D physique. Drag to rotate all the way around the character and scroll to zoom."
+          ? "Interactive 3D physique. Drag to rotate all the way around the character, scroll to zoom, click a muscle to edit its dose."
           : "3D physique preview"
       }
       role="img"
@@ -63,7 +58,7 @@ export default function CharacterScene(props: CharacterSceneProps) {
       }
     >
       <SceneLighting />
-      <RegisteredCharacterModel {...props} />
+      <RegisteredCharacterModel {...modelProps} />
       <ContactShadows
         position={[0, -2.48, 0]}
         scale={5.2}
